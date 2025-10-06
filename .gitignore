@@ -1,1 +1,5 @@
 data
+logs
+.env
+src/backend/__pycache__
+llm_eval_notebook
