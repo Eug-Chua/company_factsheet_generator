@@ -3,3 +3,4 @@ logs
 .env
 src/backend/__pycache__
 llm_eval_notebook
+src/utils/__pycache__
