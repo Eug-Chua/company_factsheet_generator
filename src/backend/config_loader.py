@@ -3,11 +3,14 @@ Configuration Loader
 Loads configuration from config.yaml and provides easy access to settings
 """
 
+import sys
 import yaml
 import logging
 from pathlib import Path
 from typing import Dict, Any
 
+# Add parent directory to path to allow importing from utils
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.log_handler import LogHandler
 
 class Config:
@@ -132,7 +135,7 @@ class Config:
     def setup_logger(
         self, log_name: str, logger_name: str = None, max_lines: int = 3000):
         """Setup logger with rotating file handler and console handler"""
-        log_path = self.get_log_path(log_name)
+        log_path = self.get_log_path()
         logger = self._setup_base_logger(logger_name)
         file_handler = self._create_file_handler(log_path, max_lines)
         console_handler = self._create_console_handler()
@@ -163,4 +166,3 @@ if __name__ == "__main__":
     logger.info(f"Chunks Path: {config.chunks_path}")
     logger.info(f"Factsheet Path: {config.factsheet_path}")
     logger.info(f"Embedding Model: {config.embedding_model}")
-    logger.info(f"Claude Model: {config.claude_model}")
