@@ -6,6 +6,7 @@ Loads configuration from config.yaml and provides easy access to settings
 import yaml
 import logging
 from pathlib import Path
+from typing import Dict, Any
 
 from utils.log_handler import LogHandler
 
@@ -21,4 +22,11 @@ class ConfigLoader:
         if config_path is None:
             config_path = self._get_default_config_path()
         self.config_path = Path(config_path)
-        self.config = None
+        self.config = self._load_config()
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load YAML config file"""
+        with open(self.config_path,'r') as f:
+            return yaml.safe_load(f)
+        
+    
