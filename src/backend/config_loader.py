@@ -23,6 +23,7 @@ class ConfigLoader:
             config_path = self._get_default_config_path()
         self.config_path = Path(config_path)
         self.config = self._load_config()
+        self._resolve_paths()
 
     def _load_config(self) -> Dict[str, Any]:
         """Load YAML config file"""
@@ -48,3 +49,53 @@ class ConfigLoader:
         project_root = Path(__file__).parent.parent.parent
         self._resolve_folder_paths(project_root)
         self._create_directories()
+
+    @property
+    def company_name(self) -> str:
+        """Get company name"""
+        return self.config['company_name']
+    
+    @property
+    def pdf_path(self) -> Path:
+        """Get PDF file path for current company"""
+        pdf_filename = self.config['pdf_files'][self.company_name]
+        return self.data_folder / pdf_filename
+    
+    @property
+    def markdown_path(self) -> Path:
+        """Get markdown file path for current company"""
+        pdf_filename = self.config["pdf_files"][self.company_name]
+        markdown_filename = Path(pdf_filename).stem + ".md"
+        return self.markdown_folder / markdown_filename
+
+    @property
+    def output_dir(self) -> Path:
+        """Get output directory for current company"""
+        output_dir = self.outputs_folder / self.company_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
+
+    @property
+    def chunks_path(self) -> Path:
+        """Get chunks JSON path for current company"""
+        return self.output_dir / f"{self.company_name}_chunks.json"
+
+    @property
+    def factsheet_path(self) -> Path:
+        """Get factsheet markdown path for current company"""
+        return self.output_dir / f"{self.company_name}_factsheet.md"
+
+    @property
+    def evaluation_path(self) -> Path:
+        """Get evaluation JSON path for current company"""
+        return self.output_dir / f"{self.company_name}_evaluation.json"
+
+    @property
+    def embedding_model(self) -> str:
+        """Get embedding model name"""
+        return self.config["embedding_model"]    
+    
+    @property
+    def chunking_config(self) -> Dict[str, int]:
+        """Get chunking configuration"""
+        return self.config.get("chunking", {})    
