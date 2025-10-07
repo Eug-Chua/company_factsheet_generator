@@ -5,14 +5,13 @@ data_folder: "data"
 markdown_folder: "markdown_files"
 outputs_folder: "outputs"
 logs_folder: "logs"
+question_set_path: "question_set.md"
 
 pdf_files:
   capitaland: "Capitaland 2024.pdf"
   dbs: "dbs-annual-report-2024.pdf"
   grab: "Grab 2024.pdf"
   sq: "SQ 2024.pdf"
-
-question_set_path: "question_set.md"
 
 embedding_model: "all-MiniLM-L6-v2"
 
