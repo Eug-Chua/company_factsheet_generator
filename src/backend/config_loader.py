@@ -10,7 +10,7 @@ from typing import Dict, Any
 
 from utils.log_handler import LogHandler
 
-class ConfigLoader:
+class Config:
     """Config manager for the credit analysis RAG system"""
 
     def _get_default_config_path(self):
@@ -98,4 +98,69 @@ class ConfigLoader:
     @property
     def chunking_config(self) -> Dict[str, int]:
         """Get chunking configuration"""
-        return self.config.get("chunking", {})    
+        return self.config.get("chunking", {})
+    
+    def get_log_path(self) -> Path:
+        """Get path for log file"""
+        return self.logs_folder / "logs.log"
+    
+    def _create_file_handler(self, log_path: Path, max_lines: int):
+        """Create and configure file handler"""
+        file_handler = LogHandler(log_path, max_lines=max_lines, mode="a")
+        file_handler.setLevel(logging.INFO)
+        file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        file_handler.setFormatter(file_formatter)
+        return file_handler
+
+    def _create_console_handler(self):
+        """Create and configure console handler"""
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_formatter = logging.Formatter(
+            "%(asctime)s - %(levelname)s - %(message)s"
+        )
+        console_handler.setFormatter(console_formatter)
+        return console_handler
+
+    def _setup_base_logger(self, logger_name: str):
+        """Setup base logger with cleared handlers"""
+        logger = logging.getLogger(logger_name or __name__)
+        logger.setLevel(logging.INFO)
+        logger.handlers.clear()
+        return logger
+
+    def setup_logger(
+        self, log_name: str, logger_name: str = None, max_lines: int = 3000):
+        """Setup logger with rotating file handler and console handler"""
+        log_path = self.get_log_path(log_name)
+        logger = self._setup_base_logger(logger_name)
+        file_handler = self._create_file_handler(log_path, max_lines)
+        console_handler = self._create_console_handler()
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        return logger
+
+    def __repr__(self):
+        return (
+            f"Config(company={self.company_name}, "
+            f"pdf={self.pdf_path.name}, "
+            f"output_dir={self.output_dir})"
+        )
+
+def load_config(config_path: str = None) -> Config:
+    """Load configuration from YAML file"""
+    return Config(config_path)
+
+if __name__ == "__main__":
+    config = load_config()
+    logger = config.setup_logger("config_test", __name__)
+
+    logger.info("Configuration loaded successfully!")
+    logger.info(f"Company: {config.company_name}")
+    logger.info(f"PDF Path: {config.pdf_path}")
+    logger.info(f"Markdown Path: {config.markdown_path}")
+    logger.info(f"Output Dir: {config.output_dir}")
+    logger.info(f"Chunks Path: {config.chunks_path}")
+    logger.info(f"Factsheet Path: {config.factsheet_path}")
+    logger.info(f"Embedding Model: {config.embedding_model}")
+    logger.info(f"Claude Model: {config.claude_model}")
