@@ -14,3 +14,7 @@ def _count_lines(self, file_path: Path) -> int:
             return sum(1 for _ in file)
     except Exception:
         return 0
+    
+def _has_space(self, file_path: Path) -> bool:
+    """Checks if file has space"""
+    return self._count_lines(file_path) < self.max_lines
