@@ -33,3 +33,30 @@ def _is_valid_log_file(self, file: Path, base_name: str) -> bool:
     """Check if log file is valid"""
     return self._extract_file_number(file, base_name) != -1
 
+def _build_file_name(self) -> Path:
+    """Build the file name to use"""
+    if self.current_file_number == 1:
+        return self.base_filename
+    base_name = self.base_filename.stem
+    base_ext = self.base_filename.suffix
+    return self.base_filename.parent / f"{base_name}_{self.current_file_number}{base_ext}"
+
+def _find_active_file(self) -> int:
+    """Find the current log file number to use"""
+    base_dir = self.base_filename.parent
+    base_name = self.base_filename.stem
+    base_ext = self.base_filename.suffix
+
+    if not base_dir.exists():
+        return 1
+    
+    max_num = 0
+    for file in sorted(base_dir.glob(f"{base_name}*{base_ext}")):
+        if not self._is_valid_log_file(file, base_name):
+            continue
+        num = self._extract_file_number(file, base_name)
+        max_num = max(max_num, num)
+        if self._has_space(file):
+            return num
+
+    return max_num + 1 if max_num > 0 else 1
