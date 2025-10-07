@@ -29,4 +29,22 @@ class ConfigLoader:
         with open(self.config_path,'r') as f:
             return yaml.safe_load(f)
         
-    
+    def _resolve_folder_paths(self, project_root: Path):
+        """Resolve folder paths"""
+        self.data_folder = (project_root / self.config['data_folder']).resolve()
+        self.markdown_folder = (project_root / self.config['markdown_folder']).resolve()
+        self.outputs_folder = (project_root / self.config['outputs_folder']).resolve()
+        self.logs_folder = (project_root / self.config['logs_folder']).resolve()
+        self.question_set_path = (project_root / self.config['question_set_path']).resolve()
+
+    def _create_directories(self):
+        """Create the necessary directories"""
+        self.markdown_folder.mkdir(parents=True, exist_ok=True)
+        self.outputs_folder.mkdir(parents=True, exist_ok=True)
+        self.logs_folder.mkdir(parents=True, exist_ok=True)
+
+    def _resolve_paths(self):
+        """Convert relative paths to absolute paths"""
+        project_root = Path(__file__).parent.parent.parent
+        self._resolve_folder_paths(project_root)
+        self._create_directories()
