@@ -102,7 +102,16 @@ class Config:
     def chunking_config(self) -> Dict[str, int]:
         """Get chunking configuration"""
         return self.config.get("chunking", {})
-    
+
+    def set_company(self, company_name: str):
+        """Change the active company"""
+        if company_name not in self.config["pdf_files"]:
+            raise ValueError(
+                f"Unknown company: {company_name}. "
+                f"Available: {list(self.config['pdf_files'].keys())}"
+            )
+        self.config["company_name"] = company_name
+
     def get_log_path(self) -> Path:
         """Get path for log file"""
         return self.logs_folder / "logs.log"
