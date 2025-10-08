@@ -4,3 +4,7 @@ logs
 src/backend/__pycache__
 llm_eval_notebook
 src/utils/__pycache__
+
+# outputs
+outputs
+markdown_files
