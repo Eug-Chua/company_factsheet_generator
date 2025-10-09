@@ -12,6 +12,8 @@ pdf_files:
   dbs: "dbs-annual-report-2024.pdf"
   grab: "Grab 2024.pdf"
   sq: "SQ 2024.pdf"
+  sea: "SEA 2024.pdf"
+  weride: "WeRide 2024.pdf"
 
 embedding_model: "all-MiniLM-L6-v2"
 
