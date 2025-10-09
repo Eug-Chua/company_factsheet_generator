@@ -96,8 +96,13 @@ class Config:
     @property
     def embedding_model(self) -> str:
         """Get embedding model name"""
-        return self.config["embedding_model"]    
-    
+        return self.config["embedding_model"]
+
+    @property
+    def openai_model(self) -> str:
+        """Get OpenAI model name"""
+        return self.config["openai_model"]
+
     @property
     def chunking_config(self) -> Dict[str, int]:
         """Get chunking configuration"""
