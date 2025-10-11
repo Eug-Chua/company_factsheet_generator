@@ -2,8 +2,10 @@ data
 logs
 .env
 src/backend/__pycache__
+src/backend/conversion/__pycache__
 llm_eval_notebook
 src/utils/__pycache__
+
 
 # outputs
 old_outputs
