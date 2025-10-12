@@ -26,7 +26,7 @@ class PromptBuilder:
         return "\n".join([f"{q['number']}. {q['text']}" for q in questions])
 
     def build_prompt_template(self) -> str:
-        """Build comprehensive prompt template for question_set_v3.md"""
+        """Build comprehensive prompt template for question_set.md"""
         return """You are a senior credit analyst creating a comprehensive credit analysis report from annual report data.
 
 # CATEGORY: {category}
