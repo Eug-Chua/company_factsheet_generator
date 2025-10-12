@@ -6,9 +6,10 @@ docling>=1.0.0
 anthropic>=0.18.0
 python-dotenv>=1.0.0
 
-# embeddings
+# Retrieval and embeddings
 sentence-transformers>=2.2.0
 torch>=2.0.0
+rank-bm25>=0.2.2  # BM25 for hybrid retrieval
 
 # Configuration
 pyyaml>=6.0
