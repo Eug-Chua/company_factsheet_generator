@@ -207,7 +207,7 @@ Result:
 (Substantive answer with clear context)
 ```
 
-**Implementation:** [`question_set_v3.md`](question_set_v3.md)
+**Implementation:** [`question_set.md`](question_set.md)
 
 ### Challenge 6: Company-Specific Terminology
 
@@ -498,7 +498,7 @@ company_factsheet_generator/
 │   ├── SQ 2024.pdf
 │   └── ...
 │
-├── question_set_v3.md                # 60 questions for factsheet
+├── question_set.md                # 60 questions for factsheet
 │
 ├── src/backend/
 │   │
@@ -637,7 +637,7 @@ embedding_model: sentence-transformers/all-mpnet-base-v2
 retrieval_strategy: hybrid
 
 # Question set
-question_set_path: question_set_v3.md
+question_set_path: question_set.md
 ```
 
 ### Run Complete Pipeline
