@@ -51,34 +51,55 @@ class PDFAnalyzer:
         doc.close()
         return pdf_text
 
-    def _get_merged_chunks_path(self) -> Path:
-        """Get path to merged chunks file"""
-        return self.config.output_dir / f"{self.config.company_name}_chunks_merged.json"
+    def _get_tables_path(self) -> Path:
+        """Get path to tables JSON file from markdown converter"""
+        markdown_path = self.config.markdown_path
+        return markdown_path.parent / f"{markdown_path.stem}_tables.json"
 
-    def _check_merged_chunks_exist(self, merged_chunks_path: Path) -> bool:
-        """Check if merged chunks file exists"""
-        if not merged_chunks_path.exists():
-            self.logger.warning(f"Merged chunks not found at {merged_chunks_path}, falling back to markdown only")
+    def _check_tables_exist(self, tables_path: Path) -> bool:
+        """Check if tables JSON file exists"""
+        if not tables_path.exists():
+            self.logger.info(f"No tables file found at {tables_path}")
             return False
         return True
 
-    def _read_chunks_from_file(self, merged_chunks_path: Path) -> list:
-        """Read chunks from JSON file"""
-        with open(merged_chunks_path, 'r', encoding='utf-8') as f:
+    def _read_tables_from_file(self, tables_path: Path) -> dict:
+        """Read tables from JSON file (returns dict with table_0, table_1, etc.)"""
+        with open(tables_path, 'r', encoding='utf-8') as f:
             return json.load(f)
 
-    def _combine_chunk_content(self, chunks: list) -> str:
-        """Combine all chunk content into single text"""
-        return "\n\n".join(chunk['content'] for chunk in chunks)
+    def _extract_table_text(self, table: dict) -> str:
+        """Extract text content from a single table"""
+        # Tables have 'markdown' or 'csv' representations
+        if 'markdown' in table and table['markdown']:
+            return table['markdown']
+        elif 'csv' in table and table['csv']:
+            return table['csv']
+        return ""
 
-    def _log_chunks_loaded(self, chunks: list, combined_text: str):
-        """Log chunks loaded information"""
-        self.logger.info(f"Loaded merged chunks: {len(chunks)} chunks ({len(combined_text):,} chars)")
+    def _combine_table_content(self, tables_dict: dict) -> str:
+        """Combine all table content into single text"""
+        table_texts = []
+        for table_id, table_data in tables_dict.items():
+            text = self._extract_table_text(table_data)
+            if text:
+                table_texts.append(text)
+        return "\n\n".join(table_texts)
+
+    def _log_tables_loaded(self, num_tables: int, table_text: str):
+        """Log tables loaded information"""
+        self.logger.info(f"Loaded tables: {num_tables} tables ({len(table_text):,} chars)")
 
     def load_merged_chunks(self) -> str:
-        """Load and combine all merged chunks into single text for validation"""
-        merged_chunks_path = self._get_merged_chunks_path()
-        if not self._check_merged_chunks_exist(merged_chunks_path): return None
-        chunks = self._read_chunks_from_file(merged_chunks_path)
-        combined_text = self._combine_chunk_content(chunks)
-        self._log_chunks_loaded(chunks, combined_text); return combined_text
+        """Load markdown and tables for validation (used at Step 2)"""
+        tables_path = self._get_tables_path()
+        if not self._check_tables_exist(tables_path):
+            self.logger.info("No tables to include in validation")
+            return None
+        tables_dict = self._read_tables_from_file(tables_path)
+        if not tables_dict:
+            self.logger.info("Tables file is empty")
+            return None
+        table_text = self._combine_table_content(tables_dict)
+        self._log_tables_loaded(len(tables_dict), table_text)
+        return table_text

@@ -128,19 +128,23 @@ class PDFExtractionValidator:
         self._log_pdf_info(pdf_metadata)
         return pdf_metadata, pdf_text
 
-    def _load_markdown_fallback(self, markdown_path):
-        """Load markdown file as fallback"""
-        self.logger.warning("Using markdown-only validation (less accurate)")
+    def _load_markdown_text(self, markdown_path):
+        """Load markdown file text"""
         with open(markdown_path, "r", encoding="utf-8") as f:
             return f.read()
 
+    def _combine_markdown_and_tables(self, markdown_text: str, table_text: str):
+        """Combine markdown and table text"""
+        if table_text:
+            return f"{markdown_text}\n\n{table_text}"
+        return markdown_text
+
     def _get_extracted_text(self, markdown_path):
-        """Get extracted text from merged chunks or markdown (Step 2)"""
-        self.logger.info("Step 2: Loading merged chunks (text + tables)...")
-        merged_text = self.pdf_analyzer.load_merged_chunks()
-        return (
-            merged_text if merged_text else self._load_markdown_fallback(markdown_path)
-        )
+        """Get extracted text from markdown and tables (Step 2)"""
+        self.logger.info("Step 2: Loading markdown and tables...")
+        markdown_text = self._load_markdown_text(markdown_path)
+        table_text = self.pdf_analyzer.load_merged_chunks()
+        return self._combine_markdown_and_tables(markdown_text, table_text)
 
     def _calculate_and_log_metrics(self, pdf_text, extracted_text):
         """Calculate extraction metrics (Step 3)"""
