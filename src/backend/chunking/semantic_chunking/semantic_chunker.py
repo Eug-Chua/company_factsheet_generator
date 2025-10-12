@@ -25,7 +25,7 @@ load_dotenv(env_path)
 class SemanticChunker:
     """Orchestrates semantic merging of chunks"""
 
-    def __init__(self, config=None, similarity_threshold=0.70, max_merged_size=3000):
+    def __init__(self, config=None, similarity_threshold=0.60, max_merged_size=4000):
         """Initialize semantic chunker"""
         self.config = config or load_config()
         self._setup_logging()
