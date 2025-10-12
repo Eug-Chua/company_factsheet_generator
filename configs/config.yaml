@@ -9,7 +9,6 @@ question_set_path: "question_set.md"
 
 pdf_files:
   capitaland: "Capitaland 2024.pdf"
-  dbs: "dbs-annual-report-2024.pdf"
   grab: "Grab 2024.pdf"
   sq: "SQ 2024.pdf"
   sea: "SEA 2024.pdf"
@@ -27,9 +26,9 @@ docling:
   export_format: "markdown"
 
 chunking:
-  min_chunk_size: 100
+  min_chunk_size: 200  # Increased to prevent empty header chunks
   max_chunk_size: 2000
 
 semantic_chunking:
-  similarity_threshold: 0.70 
-  max_merged_size: 3000 
+  similarity_threshold: 0.6
+  max_merged_size: 4000 
