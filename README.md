@@ -247,10 +247,40 @@ expanded = "EBITDA 'Adjusted EBITDA' debt 'Total Borrowings' 'Debt Obligations'"
 **Problem:** How do we measure factsheet quality without manual ground truth annotation?
 
 **Solution: RAGAS Framework**
-- **Faithfulness:** Detects hallucinations (claims not in context)
-- **Answer Relevancy:** Measures how well answer addresses question
-- **Context Precision:** Evaluates retrieval ranking quality
-- **Context Recall:** Measures retrieval completeness
+
+RAGAS was selected because it brings the promise of **LLM-as-a-Judge** to RAG evaluation—enabling us to automatically detect and quantify hallucinations without expensive human annotation. Unlike traditional metrics that require reference answers, RAGAS leverages LLMs to assess quality across multiple dimensions.
+
+**Why RAGAS?**
+
+**1. Holistic, Component-Level Evaluation**
+
+RAGAS doesn't just give you a single score for the final answer. It breaks down evaluation into the two key components of a RAG system: the **Retriever** and the **Generator**. This is incredibly useful for debugging.
+
+**For the Generator:**
+- **Faithfulness:** Does the answer stick to the provided context? This measures how factual the answer is and penalizes hallucinations. A low faithfulness score tells you the generator is making things up.
+- **Answer Relevancy:** Is the answer relevant to the user's question? This checks if the generator is actually addressing the prompt, even if it's factually correct.
+
+**For the Retriever:**
+- **Context Precision:** Are the retrieved documents relevant to the question? It measures the signal-to-noise ratio in the retrieved context. A low score means your retriever is pulling in a lot of irrelevant junk.
+- **Context Recall:** Does the retrieved context contain all the information needed to answer the question? This measures if the retriever found all the necessary pieces of the puzzle.
+
+**2. Largely Reference-Free (No Ground Truth Needed)**
+
+This is RAGAS's biggest selling point. For metrics like faithfulness, answer_relevancy, and context_precision, you **do not need to provide a human-written "perfect answer."** This dramatically reduces the cost and time of evaluation, allowing you to run assessments on thousands of data points automatically. You only need the question and context/answer from your RAG pipeline.
+
+For credit analysis factsheets with 60 questions across hundreds of companies, manual ground truth annotation would be prohibitively expensive. RAGAS makes continuous evaluation feasible.
+
+**3. Actionable and Debuggable Insights**
+
+Because RAGAS provides component-level scores, you know exactly where to focus your improvement efforts:
+
+- **Low Faithfulness?** Your generator is hallucinating. You may need to tweak your prompt, use a more capable model, or fine-tune it to be more constrained by the context.
+
+- **Low Context Recall?** Your retriever is failing to find the right information. You might need to improve your embedding model, change your chunking strategy, or implement hybrid search.
+
+- **Low Context Precision?** Your retriever is finding too much irrelevant information. You may need to refine your search algorithm or use a re-ranker.
+
+This diagnostic capability was essential for identifying and fixing our qualitative question retrieval issues (Challenge 3), where low Context Precision scores revealed that section-aware boosting was needed.
 
 **Key Design Choice:** Use **same chunks that generated each answer** for evaluation (not re-retrieved chunks)
 - Ensures fair evaluation of generation quality
