@@ -1,4 +1,4 @@
-# Credit Analysis Question Set - Version 3
+# Credit Analysis Question Set
 
 **Design Philosophy:**
 - **Atomic Questions**: One fact per question for clear retrieval targets
@@ -209,3 +209,4 @@
 **Use data from**: Q15, Q35
 
 ---
+
