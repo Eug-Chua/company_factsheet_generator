@@ -18,8 +18,8 @@ class KeywordAnalyzer:
         return {
             "Income Statement": [
                 "revenue", "gross profit", "operating profit", "EBIT", "EBITDA",
-                "net income", "net profit", "earnings per share", "EPS",
-                "cost of sales", "operating expenses", "income statement"
+                "net income", "net profit", "cost of sales", "operating expenses",
+                "income statement"
             ],
             "Balance Sheet": [
                 "total assets", "current assets", "non-current assets",
@@ -33,16 +33,13 @@ class KeywordAnalyzer:
             ],
             "Debt & Leverage": [
                 "total debt", "long-term debt", "short-term debt",
-                "net debt", "debt to equity", "interest coverage",
-                "borrowings", "financial liabilities"
+                "net debt", "borrowings", "financial liabilities"
             ],
             "Profitability Ratios": [
                 "ROE", "ROA", "ROCE", "return on equity", "return on assets",
-                "profit margin", "operating margin", "net margin"
             ],
             "Corporate Governance": [
                 "board of directors", "independent directors", "audit committee",
-                "remuneration", "corporate governance", "shareholders",
                 "related party transactions"
             ]
         }
