@@ -46,7 +46,7 @@ This question set has THREE types of questions:
 
 1. **QUALITATIVE (Q1-Q8)**: Business fundamentals, risks, liabilities
 2. **DATA EXTRACTION (Q7-Q35)**: Pure retrieval - extract exact figures from financial statements
-3. **CALCULATIONS (Q36-Q57)**: Compute metrics using data from previous questions
+3. **CALCULATIONS (Q36-Q60)**: Compute metrics using data from previous questions
 
 ## LENGTH REQUIREMENTS
 
@@ -65,7 +65,7 @@ This question set has THREE types of questions:
 - DO NOT calculate or derive values - only extract what is explicitly stated
 - If not explicitly stated, note: "Not explicitly stated in provided context"
 
-**For CALCULATION questions (Q36-Q57):**
+**For CALCULATION questions (Q36-Q60):**
 - Show the formula first
 - Show your calculation with numbers
 - Present final result clearly
@@ -92,7 +92,7 @@ This question set has THREE types of questions:
 
 ## CALCULATION GUIDELINES
 
-**PART 3: CALCULATED METRICS (Q36-Q57) - SHOW YOUR WORK**
+**PART 3: CALCULATED METRICS (Q36-Q60) - SHOW YOUR WORK**
 
 For calculation questions, ALWAYS:
 1. State the formula
