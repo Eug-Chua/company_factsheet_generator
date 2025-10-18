@@ -110,7 +110,7 @@ class SectionBooster:
         return base_boost * math.exp(-decay_rate * normalized_position)
 
     def apply_document_structure_boost(self, chunks: List[Dict], similarities,
-                                      base_boost: float = 0.3, decay_rate: float = 3.0):
+                                      base_boost: float = 0.7, decay_rate: float = 3.0):
         """Apply position-based boost to similarity scores"""
         max_chunk_id = self._calculate_max_chunk_id(chunks)
         boosted_similarities = similarities.clone()
