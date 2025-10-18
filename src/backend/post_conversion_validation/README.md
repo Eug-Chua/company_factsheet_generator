@@ -246,9 +246,7 @@ outputs/
 ### Why Validate After Extraction?
 
 1. **Early Detection:** Catch extraction issues before investing in downstream processing
-2. **Quality Assurance:** Ensures financial keywords are present (completeness check)
-3. **Debugging Aid:** Validation report helps diagnose PDF-specific extraction problems
-4. **Pipeline Safety:** Prevents garbage data from propagating through pipeline
+2. **Quality Assurance:** Ensures key financial keywords are present (completeness check)
 
 ### Why Include Tables in Validation?
 
@@ -258,14 +256,14 @@ Originally, validation only checked markdown text, **excluding tables**. This ca
 
 ### Extraction Rate >100%?
 
-Yes, this is normal! Markdown formatting adds characters:
+This is possible because markdown formatting adds characters:
 - **Markdown syntax:** `**bold**`, `# headers`, `| tables |`
 - **URLs:** Full URLs vs. hyperlinked text in PDF
 - **Spacing:** Consistent spacing in markdown vs. variable in PDF
 
-Example: "Revenue" in PDF becomes "**Total Revenue**" in markdown (more characters).
-
 ## Keyword Categories
+
+*It's fine if not all the keywords are found because some of them are synonyms. For example, some companies may choose to use EBITDA while others may choose to use operating income instead.*
 
 ### 1. Financial Statements (12 keywords)
 - income statement, balance sheet, cash flow statement
@@ -296,7 +294,7 @@ Example: "Revenue" in PDF becomes "**Total Revenue**" in markdown (more characte
 
 ## Logging
 
-Validation operations logged to `logs/logs_{timestamp}.log` with prefix `pdf_validation`.
+Validation operations logged to `logs/logs_{num}.log`.
 
 **Key Log Messages:**
 - `"Validating Docling extraction for: {company}"` - Start

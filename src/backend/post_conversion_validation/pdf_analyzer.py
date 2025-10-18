@@ -70,11 +70,8 @@ class PDFAnalyzer:
 
     def _extract_table_text(self, table: dict) -> str:
         """Extract text content from a single table"""
-        # Tables have 'markdown' or 'csv' representations
         if 'markdown' in table and table['markdown']:
             return table['markdown']
-        elif 'csv' in table and table['csv']:
-            return table['csv']
         return ""
 
     def _combine_table_content(self, tables_dict: dict) -> str:
