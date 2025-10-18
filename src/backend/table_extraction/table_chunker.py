@@ -17,135 +17,195 @@ class TableChunker:
         self.config = config
         self.table_loader = table_loader
 
-    def _create_table_chunk_dict(self, chunk_id: int, section_header: str, content: str,
-                                 table_id: str, page, shape: Dict) -> Dict:
-        """Create chunk dictionary for a table"""
-        return {'chunk_id': chunk_id, 'section_header': section_header, 'header_level': 0,
-                'content': content, 'content_type': 'table', 'table_id': table_id,
-                'table_page': page, 'table_shape': shape}
+    # ========== Helper: Chunk Creation ==========
 
-    def _is_header_line(self, line: str, index: int) -> bool:
-        """Check if line is part of table header"""
-        return index < 2 or line.startswith('|---')
-
-    def _separate_table_header_and_data(self, lines: List[str]) -> tuple[str, List[str]]:
-        """Separate table header from data lines"""
-        header_lines = [line for i, line in enumerate(lines) if self._is_header_line(line, i)]
-        data_lines = [line for i, line in enumerate(lines) if not self._is_header_line(line, i)]
-        return '\n'.join(header_lines), data_lines
-
-    def _can_fit_in_chunk(self, current_chunk: str, line: str, max_chunk_size: int) -> bool:
-        """Check if line can fit in current chunk"""
-        return len(current_chunk) + len(line) + 1 <= max_chunk_size
-
-    def _append_chunk_to_list(self, chunks: List[Dict], chunk_id_offset: int,
-                              section_header: str, chunk_num: int, current_chunk: str,
-                              table_id: str, page, shape: Dict):
-        """Append a chunk to the chunks list"""
-        chunks.append(self._create_table_chunk_dict(chunk_id_offset + len(chunks),
-                     f"{section_header} (Part {chunk_num})", current_chunk, table_id, page, shape))
-
-    def _create_multi_part_chunks(self, header_text: str, data_lines: List[str],
-                                  section_header: str, table_id: str, page, shape: Dict,
-                                  chunk_id_offset: int, chunks: List[Dict], max_chunk_size: int):
-        """Create multiple chunks from large table"""
-        current_chunk, chunk_num = header_text, 1
-        for line in data_lines:
-            if self._can_fit_in_chunk(current_chunk, line, max_chunk_size):
-                current_chunk += '\n' + line
-            else:
-                self._append_chunk_to_list(chunks, chunk_id_offset, section_header, chunk_num,
-                                          current_chunk, table_id, page, shape)
-                current_chunk, chunk_num = header_text + '\n' + line, chunk_num + 1
-        if current_chunk.strip():
-            self._append_chunk_to_list(chunks, chunk_id_offset, section_header, chunk_num,
-                                      current_chunk, table_id, page, shape)
+    def _add_chunk(
+        self, chunks: List[Dict], section_header: str, content: str
+    ):
+        """Create a chunk and append to chunks list"""
+        chunk = {
+            "chunk_id": len(chunks),
+            "section_header": section_header,
+            "header_level": 0,
+            "content": content,
+            "content_type": "table",
+        }
+        chunks.append(chunk)
 
     def _create_section_header(self, table_idx: int, page, shape: Dict) -> str:
-        """Create section header for table"""
+        """Create descriptive section header: 'Table X (Page Y): RxC'"""
         return f"Table {table_idx + 1} (Page {page}): {shape['rows']}×{shape['columns']}"
 
-    def _add_single_chunk(self, chunks: List[Dict], chunk_id_offset: int,
-                         section_header: str, markdown_content: str,
-                         table_id: str, page, shape: Dict):
-        """Add a single chunk for small table"""
-        chunks.append(self._create_table_chunk_dict(chunk_id_offset + len(chunks),
-                     section_header, markdown_content, table_id, page, shape))
+    # ========== Helper: Table Header/Data Separation ==========
 
-    def _process_large_table(self, markdown_content: str, section_header: str,
-                            table_id: str, page, shape: Dict,
-                            chunk_id_offset: int, chunks: List[Dict], max_chunk_size: int):
-        """Process a large table into multiple chunks"""
-        header_text, data_lines = self._separate_table_header_and_data(markdown_content.split('\n'))
-        self._create_multi_part_chunks(header_text, data_lines, section_header,
-                                      table_id, page, shape, chunk_id_offset, chunks, max_chunk_size)
+    def _split_header_from_data(self, markdown: str) -> tuple[str, List[str]]:
+        """
+        Split markdown table into header and data rows.
 
-    def _process_single_table_to_chunks(self, table_idx: int, table_id: str, table_info: Dict,
-                                       chunk_id_offset: int, chunks: List[Dict], max_chunk_size: int):
-        """Process a single table and add its chunks"""
-        shape, page = table_info['shape'], table_info['location'].get('page', 'unknown')
-        markdown_content = table_info['markdown']
+        Header = first 2 lines + separator line (|---|)
+        Data = all remaining lines
+        """
+        lines = markdown.split("\n")
+
+        # First 2 lines + separator are header
+        header_lines = []
+        data_lines = []
+
+        for i, line in enumerate(lines):
+            if i < 2 or line.startswith("|---"):
+                header_lines.append(line)
+            else:
+                data_lines.append(line)
+
+        return "\n".join(header_lines), data_lines
+
+    # ========== Core: Process Single Table ==========
+
+    def _split_large_table(
+        self, markdown: str, section_header: str,
+        chunks: List[Dict], max_chunk_size: int
+    ):
+        """
+        Split large table into multiple chunks, preserving header in each chunk.
+
+        Strategy:
+        1. Extract header (first 2 lines + separator)
+        2. Add data rows one by one to current chunk
+        3. When chunk is full, save it and start new chunk with header
+        """
+        header_text, data_rows = self._split_header_from_data(markdown)
+
+        current_chunk = header_text
+        part_num = 1
+
+        for row in data_rows:
+            # Check if this row fits in current chunk
+            if len(current_chunk) + len(row) + 1 <= max_chunk_size:
+                current_chunk += "\n" + row
+            else:
+                # Chunk is full - save it and start new chunk with header
+                self._add_chunk(
+                    chunks, f"{section_header} (Part {part_num})",
+                    current_chunk
+                )
+                current_chunk = header_text + "\n" + row
+                part_num += 1
+
+        # Save final chunk
+        if current_chunk.strip():
+            self._add_chunk(
+                chunks, f"{section_header} (Part {part_num})",
+                current_chunk
+            )
+
+    def _process_single_table_to_chunks(
+        self, table_idx: int, table_info: Dict,
+        chunks: List[Dict], max_chunk_size: int
+    ):
+        """
+        Convert one table into one or more chunks.
+
+        Flow:
+        1. Extract metadata (shape, page for section header)
+        2. Small table → single chunk
+        3. Large table → split with preserved headers
+        """
+        # Extract metadata (only needed for section header)
+        shape = table_info["shape"]
+        page = table_info["location"].get("page", "unknown")
+        markdown = table_info["markdown"]
         section_header = self._create_section_header(table_idx, page, shape)
-        if len(markdown_content) <= max_chunk_size:
-            self._add_single_chunk(chunks, chunk_id_offset, section_header, markdown_content, table_id, page, shape)
-        else:
-            self._process_large_table(markdown_content, section_header, table_id, page, shape,
-                                     chunk_id_offset, chunks, max_chunk_size)
 
-    def _validate_tables_data_loaded(self):
-        """Validate that tables data is loaded"""
+        # Small table - fits in single chunk
+        if len(markdown) <= max_chunk_size:
+            self._add_chunk(chunks, section_header, markdown)
+            return
+
+        # Large table - split into multiple parts
+        self._split_large_table(
+            markdown, section_header, chunks, max_chunk_size
+        )
+
+    # ========== Core: Process All Tables ==========
+
+    def create_table_chunks(self, max_chunk_size: int = 2000) -> List[Dict]:
+        """
+        Convert all loaded tables to chunks for RAG retrieval.
+
+        Returns:
+            List of chunk dictionaries with IDs starting at 0
+        """
         if not self.table_loader.tables_data:
             raise ValueError("No tables loaded. Call load_tables() first.")
 
-    def _process_all_tables_to_chunks(self, chunk_id_offset: int, chunks: List[Dict], max_chunk_size: int):
-        """Process all tables and convert to chunks"""
-        for table_idx, (table_id, table_info) in enumerate(self.table_loader.tables_data.items()):
-            self._process_single_table_to_chunks(table_idx, table_id, table_info, chunk_id_offset, chunks, max_chunk_size)
+        chunks = []
+        num_tables = len(self.table_loader.tables_data)
+        self.logger.info(f"Creating chunks from {num_tables} tables...")
 
-    def create_table_chunks(self, max_chunk_size: int = 2000) -> List[Dict]:
-        """Convert tables to chunks for RAG retrieval"""
-        self._validate_tables_data_loaded()
-        chunks, chunk_id_offset = [], 10000
-        self.logger.info(f"Creating chunks from {len(self.table_loader.tables_data)} tables...")
-        self._process_all_tables_to_chunks(chunk_id_offset, chunks, max_chunk_size)
-        self.logger.info(f"✓ Created {len(chunks)} table chunks from {len(self.table_loader.tables_data)} tables")
+        for table_idx, (_, table_info) in enumerate(self.table_loader.tables_data.items()):
+            self._process_single_table_to_chunks(
+                table_idx, table_info,
+                chunks, max_chunk_size
+            )
+
+        self.logger.info(f"✓ Created {len(chunks)} table chunks from {num_tables} tables")
         return chunks
 
-    def _get_default_output_path(self) -> Path:
-        """Get default output path for table chunks"""
-        return self.config.output_dir / f"{self.config.company_name}_table_chunks.json"
+    # ========== Pipeline: Save & Complete Process ==========
 
-    def _prepare_output_path(self, output_path: Optional[Path]) -> Path:
-        """Prepare output path and create parent directories"""
-        output_path = Path(output_path or self._get_default_output_path())
+    def save_table_chunks(
+        self, chunks: List[Dict], output_path: Optional[Path] = None
+    ) -> Path:
+        """
+        Save table chunks to JSON file.
+
+        Args:
+            chunks: List of chunk dictionaries
+            output_path: Optional custom output path
+
+        Returns:
+            Path where chunks were saved
+        """
+        # Determine output path
+        if output_path is None:
+            output_path = self.config.output_dir / f"{self.config.company_name}_table_chunks.json"
+        output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        return output_path
 
-    def _write_chunks_to_file(self, chunks: List[Dict], output_path: Path):
-        """Write chunks to JSON file"""
-        with open(output_path, 'w', encoding='utf-8') as f:
+        # Write to file
+        with open(output_path, "w", encoding="utf-8") as f:
             json.dump(chunks, f, indent=2, ensure_ascii=False)
 
-    def save_table_chunks(self, chunks: List[Dict], output_path: Optional[Path] = None) -> Path:
-        """Save table chunks to JSON file"""
-        output_path = self._prepare_output_path(output_path)
-        self._write_chunks_to_file(chunks, output_path)
         self.logger.info(f"✓ Saved {len(chunks)} table chunks to: {output_path}")
         return output_path
 
-    def _calculate_avg_chunk_size(self, chunks: List[Dict]) -> float:
-        """Calculate average chunk size"""
-        return sum(len(c['content']) for c in chunks) / len(chunks) if chunks else 0
+    def process_tables_to_chunks(
+        self, tables_path: Optional[Path] = None, max_chunk_size: int = 2000
+    ) -> Dict:
+        """
+        Complete pipeline: load tables → create chunks → save.
 
-    def _build_processing_result(self, chunks: List[Dict], output_path: Path) -> Dict:
-        """Build processing result dictionary"""
-        return {'num_tables': len(self.table_loader.tables_data), 'num_chunks': len(chunks),
-                'avg_chunk_size': self._calculate_avg_chunk_size(chunks), 'output_path': output_path}
-
-    def process_tables_to_chunks(self, tables_path: Optional[Path] = None,
-                                 max_chunk_size: int = 2000) -> Dict:
-        """Complete pipeline: load tables → create chunks → save"""
+        Returns:
+            Dict with processing statistics:
+            - num_tables: Number of tables processed
+            - num_chunks: Number of chunks created
+            - avg_chunk_size: Average chunk size in characters
+            - output_path: Path where chunks were saved
+        """
+        # Load tables
         self.table_loader.load_tables(tables_path)
+
+        # Create chunks
         chunks = self.create_table_chunks(max_chunk_size)
+
+        # Save chunks
         output_path = self.save_table_chunks(chunks)
-        return self._build_processing_result(chunks, output_path)
+
+        # Return statistics
+        avg_size = sum(len(c["content"]) for c in chunks) / len(chunks) if chunks else 0
+        return {
+            "num_tables": len(self.table_loader.tables_data),
+            "num_chunks": len(chunks),
+            "avg_chunk_size": avg_size,
+            "output_path": output_path,
+        }
