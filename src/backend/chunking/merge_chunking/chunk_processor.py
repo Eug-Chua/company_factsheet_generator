@@ -27,11 +27,11 @@ class ChunkProcessor:
         return text_chunks
 
     def _renumber_chunk_ids(self, text_chunks: List[Dict], table_chunks: List[Dict]):
-        """Renumber chunk IDs to avoid conflicts"""
+        """Renumber chunk IDs sequentially"""
         for i, chunk in enumerate(text_chunks):
             chunk['chunk_id'] = i
         for i, chunk in enumerate(table_chunks):
-            chunk['chunk_id'] = 10000 + i
+            chunk['chunk_id'] = len(text_chunks) + i
 
     def _combine_and_log_chunks(self, text_chunks: List[Dict], table_chunks: List[Dict]) -> List[Dict]:
         """Combine chunks and log merge statistics"""
