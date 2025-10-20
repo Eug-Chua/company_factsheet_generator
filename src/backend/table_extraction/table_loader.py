@@ -5,8 +5,7 @@ Handles loading and accessing table data from JSON files
 
 import json
 from pathlib import Path
-from typing import List, Dict, Optional, Any
-import pandas as pd
+from typing import Dict, Optional
 
 
 class TableLoader:
@@ -48,57 +47,3 @@ class TableLoader:
         self.logger.info(f"Loaded {len(self.tables_data)} tables")
         return self.tables_data
 
-    def _create_table_metadata(self, table_id: str, table_info: Dict) -> Dict:
-        """Create metadata dict for a table"""
-        return {
-            "table_id": table_id,
-            "rows": table_info["shape"]["rows"],
-            "columns": table_info["shape"]["columns"],
-            "page": table_info["location"].get("page"),
-        }
-
-    def get_table_list(self) -> List[Dict[str, Any]]:
-        """Get list of all tables with metadata"""
-        if not self.tables_data:
-            raise ValueError("No tables loaded. Call load_tables() first.")
-        return [
-            self._create_table_metadata(tid, tinfo)
-            for tid, tinfo in self.tables_data.items()
-        ]
-
-    def get_table_by_id(self, table_id: str) -> Optional[pd.DataFrame]:
-        """Get table as DataFrame by ID"""
-        if not self.tables_data:
-            raise ValueError("No tables loaded. Call load_tables() first.")
-        if table_id not in self.tables_data:
-            self.logger.warning(f"Table {table_id} not found")
-            return None
-        table_data = self.tables_data[table_id]["dataframe"]
-        return pd.DataFrame(table_data)
-
-    def get_table_markdown(self, table_id: str) -> Optional[str]:
-        """Get table as markdown string"""
-        if not self.tables_data:
-            raise ValueError("No tables loaded. Call load_tables() first.")
-        if table_id not in self.tables_data:
-            return None
-        return self.tables_data[table_id]["markdown"]
-
-    def _format_table_summary_line(self, table_id: str, table_info: Dict) -> str:
-        """Format a single table summary line"""
-        shape = table_info["shape"]
-        page = table_info["location"].get("page", "unknown")
-        return f"  {table_id}: {shape['rows']} rows × {shape['columns']} cols (page {page})"
-
-    def _build_summary_lines(self) -> List[str]:
-        """Build list of summary lines for all tables"""
-        summary = [f"Loaded {len(self.tables_data)} tables:\n"]
-        for table_id, table_info in self.tables_data.items():
-            summary.append(self._format_table_summary_line(table_id, table_info))
-        return summary
-
-    def get_table_summary(self) -> str:
-        """Get a summary of all loaded tables"""
-        if not self.tables_data:
-            return "No tables loaded"
-        return "\n".join(self._build_summary_lines())
