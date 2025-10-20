@@ -94,8 +94,24 @@ class SemanticChunker:
         self.statistics.log_merge_summary(len(chunks), len(merged_chunks), total_merges)
         return merged_chunks
 
-    def merge_chunks(self, chunks_path: Optional[Path] = None) -> Dict:
-        """Load chunks from file and apply semantic merging"""
+    def run(self, chunks_path: Optional[Path] = None) -> Dict:
+        """
+        Execute the complete semantic chunking pipeline.
+
+        This is the main entry point for semantic chunk merging.
+        Encapsulates the internal workflow: load chunks → embed → merge → save.
+
+        Args:
+            chunks_path: Optional path to chunks JSON. If None, uses config default.
+
+        Returns:
+            Dict with merge statistics:
+                - num_chunks: Final number of chunks after merging
+                - original_chunks: Original number of chunks before merging
+                - reduction_pct: Percentage reduction in chunk count
+                - avg_chunk_size: Average chunk size after merging
+                - output_path: Path where merged chunks were saved
+        """
         chunks_path = chunks_path or self.config.chunks_path
         basic_chunks = self.loader.load_chunks_file(chunks_path)
         self.logger.info(f"Applying semantic merging (threshold={self.similarity_threshold})...")
@@ -112,51 +128,4 @@ class SemanticChunker:
         """Complete pipeline: Markdown → Basic Chunks → Semantic Merging"""
         markdown_path = markdown_path or self.config.markdown_path
         basic_result = self._perform_basic_chunking(markdown_path)
-        return self.merge_chunks(basic_result['chunks_path'])
-
-
-# CLI Functions
-
-def _create_semantic_cli_parser():
-    """Create and configure argument parser"""
-    import argparse
-    parser = argparse.ArgumentParser(description="Apply semantic chunking with table-aware merging")
-    parser.add_argument('--chunks', type=str, required=True, help='Path to chunks JSON file')
-    parser.add_argument('--output', type=str, help='Path for output merged chunks (optional)')
-    parser.add_argument('--threshold', type=float, default=0.70, help='Similarity threshold (default: 0.70)')
-    parser.add_argument('--max-size', type=int, default=3000, help='Maximum merged chunk size (default: 3000)')
-    return parser
-
-def _validate_and_get_chunks_path(chunks_str: str):
-    """Validate chunks path and return Path object"""
-    chunks_path = Path(chunks_str)
-    if not chunks_path.exists():
-        raise FileNotFoundError(f"Chunks file not found: {chunks_path}")
-    return chunks_path
-
-def _get_output_path(chunks_path, output_arg):
-    """Get output path for merged chunks"""
-    return Path(output_arg) if output_arg else chunks_path.parent / "chunks_semantic.json"
-
-def _save_cli_results(merged_chunks, output_path):
-    """Save merged chunks and print confirmation"""
-    import json
-    with open(output_path, 'w', encoding='utf-8') as f:
-        json.dump(merged_chunks, f, indent=2, ensure_ascii=False)
-    print(f"\n✓ Saved {len(merged_chunks)} merged chunks to {output_path}")
-
-def main():
-    """CLI entry point for testing"""
-    parser = _create_semantic_cli_parser()
-    args = parser.parse_args()
-    chunks_path = _validate_and_get_chunks_path(args.chunks)
-    print(f"Loading {chunks_path}")
-    chunker = SemanticChunker(similarity_threshold=args.threshold, max_merged_size=args.max_size)
-    chunks = chunker.loader.load_chunks_file(chunks_path)
-    merged_chunks = chunker._merge_similar_chunks(chunks)
-    output_path = _get_output_path(chunks_path, args.output)
-    _save_cli_results(merged_chunks, output_path)
-
-
-if __name__ == "__main__":
-    main()
+        return self.run(basic_result['chunks_path'])
