@@ -13,7 +13,7 @@ class TextProcessor:
     """Handles clean text extraction from PDFs (Pass 1: No tables)"""
 
     def __init__(self, logger):
-        """Initialize text processor with logger"""
+        """Initialize text processor with docling"""
         self.logger = logger
         self.converter = self._init_text_converter()
         self.logger.info("Text processor initialized (clean extraction)")
