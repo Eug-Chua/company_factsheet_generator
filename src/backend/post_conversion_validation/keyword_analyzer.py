@@ -23,8 +23,8 @@ class KeywordAnalyzer:
             ],
             "Balance Sheet": [
                 "total assets", "current assets", "non-current assets",
-                "total liabilities", "current liabilities", "shareholders equity",
-                "share capital", "retained earnings", "balance sheet"
+                "total liabilities", "current liabilities",  "non-current liabilities",
+                "shareholders equity", "share capital", "balance sheet"
             ],
             "Cash Flow": [
                 "cash flow", "operating cash flow", "investing cash flow",
@@ -35,12 +35,8 @@ class KeywordAnalyzer:
                 "total debt", "long-term debt", "short-term debt",
                 "net debt", "borrowings", "financial liabilities"
             ],
-            "Profitability Ratios": [
-                "ROE", "ROA", "ROCE", "return on equity", "return on assets",
-            ],
             "Corporate Governance": [
-                "board of directors", "independent directors", "audit committee",
-                "related party transactions"
+                "board of directors", "independent directors", "audit committee"
             ]
         }
 
