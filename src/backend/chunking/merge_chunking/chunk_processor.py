@@ -47,5 +47,6 @@ class ChunkProcessor:
             return self._handle_missing_table_chunks(text_chunks)
         table_chunks = self.chunk_loader.load_chunks(table_chunks_path)
         self._add_content_type_to_chunks(text_chunks, 'text')
+        self._add_content_type_to_chunks(table_chunks, 'table')
         self._renumber_chunk_ids(text_chunks, table_chunks)
         return self._combine_and_log_chunks(text_chunks, table_chunks)
