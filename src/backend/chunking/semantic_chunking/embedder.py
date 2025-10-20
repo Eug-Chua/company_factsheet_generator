@@ -22,15 +22,6 @@ class Embedder:
         max_chars = 30000  # ~7500 tokens, leaving buffer
         return text[:max_chars] if len(text) > max_chars else text
 
-    def _get_embedding(self, text: str) -> np.ndarray:
-        """Get OpenAI embedding for text"""
-        text = self._truncate_text(text)
-        response = self.client.embeddings.create(
-            input=text,
-            model=self.embedding_model
-        )
-        return np.array(response.data[0].embedding)
-
     def _calculate_vector_norms(self, vec1: np.ndarray, vec2: np.ndarray) -> tuple:
         """Calculate norms of two vectors"""
         return np.linalg.norm(vec1), np.linalg.norm(vec2)
