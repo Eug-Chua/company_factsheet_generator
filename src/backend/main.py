@@ -9,12 +9,12 @@ from typing import Dict, Optional
 from config_loader import load_config
 from conversion.markdown_converter import MarkdownConverter
 from extraction.extractor import MarkdownExtractor
-from pre_extraction_validation.conversion_validator import PDFExtractionValidator
+from post_conversion_validation.conversion_validator import PDFExtractionValidator
 from table_extraction.table_extractor import NumericalExtractor
 from chunking.merge_chunking.chunk_merger import ChunkMerger
 from chunking.semantic_chunking.semantic_chunker import SemanticChunker
 from generation.factsheet_generator import FactsheetGenerator
-from llm_evaluation import FactsheetEvaluator
+from evaluation.ragas_evaluator import FactsheetEvaluator
 
 
 class CreditAnalysisPipeline:
@@ -159,7 +159,7 @@ class CreditAnalysisPipeline:
         """Extract table chunks from tables JSON"""
         self.logger.info("\nStep 4: Extracting table chunks from tables...")
         try:
-            table_result = self.numerical_extractor.process_tables_to_chunks()
+            table_result = self.numerical_extractor.run()
             results['steps']['table_extraction'] = {
                 'status': 'success',
                 'num_tables': table_result['num_tables'],
@@ -184,7 +184,7 @@ class CreditAnalysisPipeline:
             return text_result
 
         self.logger.info("\nStep 5: Merging text and table chunks...")
-        merge_result = self.chunk_merger.process_and_merge(
+        merge_result = self.chunk_merger.run(
             text_chunks_path=text_result['chunks_path'],
             table_chunks_path=table_result['output_path']
         )
