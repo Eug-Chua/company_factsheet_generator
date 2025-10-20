@@ -59,47 +59,25 @@ class ChunkMerger:
         self.statistics.log_merge_summary(stats, output_path, self.config.company_name)
         return stats
 
-    def process_and_merge(self, text_chunks_path: Path = None,
-                          table_chunks_path: Path = None) -> Dict:
-        """Complete merge pipeline"""
+    def run(self, text_chunks_path: Path = None,
+            table_chunks_path: Path = None) -> Dict:
+        """
+        Execute the complete chunk merge pipeline.
+
+        This is the main entry point for merging text and table chunks.
+        Encapsulates the internal workflow: load chunks → merge → save.
+
+        Args:
+            text_chunks_path: Optional path to text chunks JSON. If None, uses config default.
+            table_chunks_path: Optional path to table chunks JSON. If None, uses config default.
+
+        Returns:
+            Dict with merge statistics:
+                - text_chunks: Number of text chunks
+                - table_chunks: Number of table chunks
+                - total_chunks: Total number of merged chunks
+                - output_path: Path where merged chunks were saved
+        """
         text_path, table_path = self._resolve_merge_paths(text_chunks_path, table_chunks_path)
         merged_chunks, output_path = self._merge_and_save(text_path, table_path)
         return self._finalize_merge_stats(merged_chunks, output_path)
-
-
-# CLI Functions
-
-def _create_cli_parser():
-    """Create and configure argument parser"""
-    import argparse
-    parser = argparse.ArgumentParser(description="Merge text and table chunks")
-    parser.add_argument('--company', type=str, required=True, help='Company name')
-    parser.add_argument('--text-chunks', type=str, help='Path to text chunks JSON (optional, auto-detects)')
-    parser.add_argument('--table-chunks', type=str, help='Path to table chunks JSON (optional, auto-detects)')
-    parser.add_argument('--config', type=str, help='Path to config.yaml file (optional)')
-    return parser
-
-def _load_config_and_setup(args):
-    """Load config and initialize merger"""
-    config = load_config(args.config) if args.config else load_config()
-    config.set_company(args.company)
-    return ChunkMerger(config)
-
-def _resolve_chunk_paths(args):
-    """Resolve chunk paths from arguments"""
-    text_path = Path(args.text_chunks) if args.text_chunks else None
-    table_path = Path(args.table_chunks) if args.table_chunks else None
-    return text_path, table_path
-
-def main():
-    """CLI entry point"""
-    parser = _create_cli_parser()
-    args = parser.parse_args()
-    merger = _load_config_and_setup(args)
-    text_path, table_path = _resolve_chunk_paths(args)
-    merger.process_and_merge(text_path, table_path)
-    merger.logger.info(f"✓ Merge complete for {merger.config.company_name}")
-
-
-if __name__ == "__main__":
-    main()
