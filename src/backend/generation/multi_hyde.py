@@ -20,7 +20,7 @@ class MultiHyDE:
     6. Rerank using original question
     """
 
-    def __init__(self, llm_client, embedder, logger, config):
+    def __init__(self, llm_client, embedder, logger, config, section_booster=None):
         """
         Initialize Multi-HyDE module
 
@@ -29,16 +29,19 @@ class MultiHyDE:
             embedder: Embedder for encoding hypothetical documents
             logger: Logger instance
             config: Configuration object
+            section_booster: Optional SectionBooster for section-aware boosting
         """
         self.llm_client = llm_client
         self.embedder = embedder
         self.logger = logger
         self.config = config
+        self.section_booster = section_booster
 
         # Multi-HyDE parameters (can be configured)
         self.num_variants = self.config.config.get('multi_hyde', {}).get('num_variants', 5)
         self.k_per_hypothetical = self.config.config.get('multi_hyde', {}).get('k_per_hypothetical', 10)
         self.use_cross_encoder = self.config.config.get('multi_hyde', {}).get('use_cross_encoder', False)
+        self.use_section_boost = self.config.config.get('multi_hyde', {}).get('use_section_boost', True)
 
         # Initialize cross-encoder if enabled
         self.cross_encoder = None
@@ -268,35 +271,11 @@ Write ONLY the passage, no preamble or explanation.
 
         return list(chunk_map.values())
 
-    def _rerank_with_biencoder(self, question: str, chunks: List[Dict],
-                               top_k: int) -> List[Dict]:
-        """
-        Rerank chunks using bi-encoder (semantic similarity)
-
-        Args:
-            question: Original user question
-            chunks: Chunks to rerank
-            top_k: Number of chunks to return
-
-        Returns:
-            Top-k reranked chunks
-        """
-        # Prepare chunk texts
-        chunk_texts = self.embedder._prepare_chunk_texts(chunks)
-
-        # Encode original question and chunks
-        question_emb, chunk_embs = self.embedder.encode_embeddings(question, chunk_texts)
-
-        # Calculate similarities
-        similarities = self.embedder._calculate_similarities(question_emb, chunk_embs)
-
-        # Get top-k chunks
-        return self.embedder.get_top_chunks(chunks, similarities, top_k)
 
     def _rerank_with_crossencoder(self, question: str, chunks: List[Dict],
                                   top_k: int) -> List[Dict]:
         """
-        Rerank chunks using cross-encoder (more accurate but slower)
+        Rerank chunks using cross-encoder with optional section-aware boosting
 
         Args:
             question: Original user question
@@ -307,8 +286,8 @@ Write ONLY the passage, no preamble or explanation.
             Top-k reranked chunks
         """
         if not self.cross_encoder:
-            self.logger.warning("Cross-encoder not initialized, falling back to bi-encoder")
-            return self._rerank_with_biencoder(question, chunks, top_k)
+            self.logger.warning("Cross-encoder not initialized, cannot rerank")
+            return chunks[:top_k]
 
         # Create question-chunk pairs
         pairs = [(question, chunk['content']) for chunk in chunks]
@@ -316,10 +295,24 @@ Write ONLY the passage, no preamble or explanation.
         # Score all pairs with cross-encoder
         scores = self.cross_encoder.predict(pairs)
 
-        # Rank by scores (descending)
+        # Apply section-aware boost to cross-encoder scores
+        if self.section_booster and self.use_section_boost:
+            self.logger.debug("Applying section-aware boost to cross-encoder scores...")
+            patterns = self.section_booster.get_section_patterns_for_question(question)
+            relevant_indices = self.section_booster.detect_relevant_sections(chunks, patterns)
+
+            if relevant_indices:
+                self.logger.debug(f"  Boosting {len(relevant_indices)} chunks from relevant sections")
+
+            # Apply boost factor (same as baseline: 0.8 → 1.8× multiplier)
+            boost_factor = 0.8
+            for idx in relevant_indices:
+                scores[idx] = scores[idx] * (1 + boost_factor)
+
+        # Rank by boosted scores (descending)
         ranked_indices = np.argsort(scores)[::-1][:top_k]
 
-        # Build reranked chunks with cross-encoder scores
+        # Build reranked chunks with final scores
         reranked_chunks = []
         for idx in ranked_indices:
             chunk = chunks[idx].copy()
@@ -331,10 +324,7 @@ Write ONLY the passage, no preamble or explanation.
     def _rerank_with_original_question(self, question: str, chunks: List[Dict],
                                        top_k: int) -> List[Dict]:
         """
-        Rerank deduplicated chunks using original question
-        Uses hybrid two-stage approach if cross-encoder is enabled:
-          1. Bi-encoder: Fast filtering to top 2×k candidates
-          2. Cross-encoder: Accurate reranking to final top-k
+        Rerank deduplicated chunks using cross-encoder with section-aware boost
 
         Args:
             question: Original user question
@@ -344,29 +334,16 @@ Write ONLY the passage, no preamble or explanation.
         Returns:
             Top-k reranked chunks
         """
-        self.logger.debug(f"Reranking {len(chunks)} chunks with original question...")
+        self.logger.debug(f"Reranking {len(chunks)} chunks with cross-encoder + section boost...")
 
-        if self.use_cross_encoder and self.cross_encoder:
-            # Hybrid two-stage reranking
-            self.logger.debug("Using hybrid reranking (bi-encoder → cross-encoder)")
+        if not self.cross_encoder:
+            self.logger.warning("Cross-encoder not initialized, returning chunks by original score")
+            return sorted(chunks, key=lambda x: x.get('similarity_score', 0), reverse=True)[:top_k]
 
-            # Stage 1: Bi-encoder to reduce candidate set
-            intermediate_k = min(len(chunks), top_k * 2)  # 2× final amount
-            self.logger.debug(f"  Stage 1 (bi-encoder): {len(chunks)} → {intermediate_k} chunks")
-            semifinal_chunks = self._rerank_with_biencoder(question, chunks, intermediate_k)
-
-            # Stage 2: Cross-encoder for final accurate ranking
-            self.logger.debug(f"  Stage 2 (cross-encoder): {intermediate_k} → {top_k} chunks")
-            final_chunks = self._rerank_with_crossencoder(question, semifinal_chunks, top_k)
-
-            self.logger.debug(f"✓ Hybrid reranking complete: {len(final_chunks)} final chunks")
-            return final_chunks
-        else:
-            # Standard bi-encoder reranking
-            self.logger.debug("Using bi-encoder reranking")
-            reranked_chunks = self._rerank_with_biencoder(question, chunks, top_k)
-            self.logger.debug(f"✓ Reranked to top-{len(reranked_chunks)} chunks")
-            return reranked_chunks
+        # Cross-encoder reranking with section-aware boost
+        final_chunks = self._rerank_with_crossencoder(question, chunks, top_k)
+        self.logger.debug(f"✓ Reranking complete: {len(final_chunks)} final chunks")
+        return final_chunks
 
     def retrieve_with_multi_hyde(self, question: str, chunks: List[Dict],
                                  top_k: int = 30) -> List[Dict]:
