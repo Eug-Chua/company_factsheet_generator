@@ -122,7 +122,7 @@ class CreditAnalysisPipeline:
         qual = validation_data['quality_assessment']
         return {
             'status': 'success',
-            'quality': qual['quality'],
+            'quality': qual['status'],
             'char_extraction_rate': qual['char_extraction_rate'],
             'keyword_coverage': qual['keyword_coverage_rate'],
             'output': str(validation_path)
@@ -131,7 +131,7 @@ class CreditAnalysisPipeline:
     def _log_validation_complete(self, validation_data):
         """Log validation completion"""
         qual = validation_data['quality_assessment']
-        self.logger.info(f"✓ PDF validation complete: {qual['quality']} quality "
+        self.logger.info(f"✓ PDF validation complete: {qual['status']} quality "
                         f"({qual['char_extraction_rate']:.1f}% extraction, "
                         f"{qual['keyword_coverage_rate']:.1f}% keywords)")
 
@@ -201,7 +201,7 @@ class CreditAnalysisPipeline:
     def _apply_semantic_chunking_merged(self, merge_result: Dict, results: Dict):
         """Apply semantic chunking to merged chunks"""
         self.logger.info("\nStep 6: Applying semantic chunking to merged chunks...")
-        semantic_result = self.semantic_chunker.merge_chunks(chunks_path=merge_result['output_path'])
+        semantic_result = self.semantic_chunker.run(chunks_path=merge_result['output_path'])
         results['steps']['semantic_chunking'] = self._build_semantic_result(semantic_result)
         self.logger.info(f"✓ Semantic chunking complete: {semantic_result['num_chunks']} chunks "
                         f"({semantic_result['reduction_pct']:.1f}% reduction)")
@@ -220,7 +220,7 @@ class CreditAnalysisPipeline:
     def _apply_semantic_chunking(self, extraction_result: Dict, results: Dict):
         """Apply semantic chunking"""
         self.logger.info("\nStep 4: Applying semantic chunking...")
-        semantic_result = self.semantic_chunker.merge_chunks(chunks_path=extraction_result['chunks_path'])
+        semantic_result = self.semantic_chunker.run(chunks_path=extraction_result['chunks_path'])
         results['steps']['semantic_chunking'] = self._build_semantic_result(semantic_result)
         self.logger.info(f"✓ Semantic chunking complete: {semantic_result['num_chunks']} chunks "
                         f"({semantic_result['reduction_pct']:.1f}% reduction)")
