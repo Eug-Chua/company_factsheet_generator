@@ -32,4 +32,12 @@ chunking:
 
 semantic_chunking:
   similarity_threshold: 0.6
-  max_merged_size: 4000 
+  max_merged_size: 4000
+
+# Multi-HyDE Configuration
+multi_hyde:
+  enabled: true  # Set to true to enable Multi-HyDE retrieval
+  num_variants: 5  # Number of query variants to generate (paper uses 3-5)
+  k_per_hypothetical: 10  # Top-k chunks to retrieve per hypothetical doc (paper uses 10)
+  use_cross_encoder: true  # Set to true to use cross-encoder for final reranking (slower but more accurate)
+  cross_encoder_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Cross-encoder model for reranking 
