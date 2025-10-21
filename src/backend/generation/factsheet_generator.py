@@ -48,7 +48,7 @@ class FactsheetGenerator:
         """Initialize retrieval components"""
         self.section_booster = SectionBooster(self.logger)
         self.bm25_retriever = BM25Retriever(self.logger)
-        self.multi_hyde = MultiHyDE(self.llm_client, self.embedder, self.logger, self.config)
+        self.multi_hyde = MultiHyDE(self.llm_client, self.embedder, self.logger, self.config, self.section_booster)
 
     def _init_generation_components(self):
         """Initialize generation components"""
