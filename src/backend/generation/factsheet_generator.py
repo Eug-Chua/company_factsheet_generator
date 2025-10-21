@@ -19,6 +19,7 @@ from .prompt_builder import PromptBuilder
 from .answer_generator import AnswerGenerator
 from .category_parser import CategoryParser
 from .factsheet_formatter import FactsheetFormatter
+from .multi_hyde import MultiHyDE
 
 load_dotenv()
 
@@ -47,6 +48,7 @@ class FactsheetGenerator:
         """Initialize retrieval components"""
         self.section_booster = SectionBooster(self.logger)
         self.bm25_retriever = BM25Retriever(self.logger)
+        self.multi_hyde = MultiHyDE(self.llm_client, self.embedder, self.logger, self.config)
 
     def _init_generation_components(self):
         """Initialize generation components"""
@@ -121,9 +123,18 @@ class FactsheetGenerator:
 
     def _retrieve_semantic_only(self, question: str, chunks: List[Dict], top_k: int):
         """Retrieve using pure semantic search with section-aware boost"""
-        self.logger.info("Using SEMANTIC-ONLY retrieval with section-aware boost...")
-        relevant_chunks = self.retrieve_relevant_chunks(question, chunks, top_k=top_k, section_aware=True)
-        self.logger.info(f"Retrieved {len(relevant_chunks)} chunks (semantic + section-aware)")
+        # Check if Multi-HyDE is enabled in config
+        use_multi_hyde = self.config.config.get('multi_hyde', {}).get('enabled', False)
+
+        if use_multi_hyde:
+            self.logger.info("Using Multi-HyDE retrieval...")
+            relevant_chunks = self.multi_hyde.retrieve_with_multi_hyde(question, chunks, top_k=top_k)
+            self.logger.info(f"Retrieved {len(relevant_chunks)} chunks (Multi-HyDE)")
+        else:
+            self.logger.info("Using SEMANTIC-ONLY retrieval with section-aware boost...")
+            relevant_chunks = self.retrieve_relevant_chunks(question, chunks, top_k=top_k, section_aware=True)
+            self.logger.info(f"Retrieved {len(relevant_chunks)} chunks (semantic + section-aware)")
+
         return relevant_chunks
 
     def _apply_terminology_substitution(self, keywords: str):
