@@ -5,6 +5,7 @@ Implements multi-query expansion and hypothetical document generation for improv
 
 from typing import List, Dict
 import numpy as np
+from sentence_transformers import CrossEncoder
 
 
 class MultiHyDE:
@@ -14,13 +15,13 @@ class MultiHyDE:
     Process:
     1. Generate N diverse query variants from original question
     2. Generate hypothetical document for each variant
-    3. Embed hypothetical documents (not questions)
+    3. Embed hypothetical documents (answers, not questions)
     4. Retrieve top-k chunks per hypothetical document
     5. Aggregate and deduplicate results
     6. Rerank using original question
     """
 
-    def __init__(self, llm_client, embedder, logger, config, section_booster=None):
+    def __init__(self, llm_client, embedder, logger, config, section_booster):
         """
         Initialize Multi-HyDE module
 
@@ -29,34 +30,29 @@ class MultiHyDE:
             embedder: Embedder for encoding hypothetical documents
             logger: Logger instance
             config: Configuration object
-            section_booster: Optional SectionBooster for section-aware boosting
+            section_booster: SectionBooster for section-aware boosting
         """
         self.llm_client = llm_client
         self.embedder = embedder
         self.logger = logger
         self.config = config
         self.section_booster = section_booster
+        self.use_cross_encoder = True
 
-        # Multi-HyDE parameters (can be configured)
+        # Multi-HyDE parameters
         self.num_variants = self.config.config.get('multi_hyde', {}).get('num_variants', 5)
         self.k_per_hypothetical = self.config.config.get('multi_hyde', {}).get('k_per_hypothetical', 10)
-        self.use_cross_encoder = self.config.config.get('multi_hyde', {}).get('use_cross_encoder', False)
-        self.use_section_boost = self.config.config.get('multi_hyde', {}).get('use_section_boost', True)
 
-        # Initialize cross-encoder if enabled
-        self.cross_encoder = None
-        if self.use_cross_encoder:
-            try:
-                from sentence_transformers import CrossEncoder
-                cross_encoder_model = self.config.config.get('multi_hyde', {}).get(
-                    'cross_encoder_model', 'cross-encoder/ms-marco-MiniLM-L-6-v2'
-                )
-                self.logger.info(f"Loading cross-encoder model: {cross_encoder_model}")
-                self.cross_encoder = CrossEncoder(cross_encoder_model)
-                self.logger.info("✓ Cross-encoder loaded")
-            except ImportError:
-                self.logger.warning("sentence-transformers not installed, cross-encoder disabled")
-                self.use_cross_encoder = False
+        try:
+            cross_encoder_model = self.config.config.get('multi_hyde', {}).get(
+                'cross_encoder_model', 'cross-encoder/ms-marco-MiniLM-L-6-v2'
+            )
+            self.logger.info(f"Loading cross-encoder model: {cross_encoder_model}")
+            self.cross_encoder = CrossEncoder(cross_encoder_model)
+            self.logger.info("✓ Cross-encoder loaded")
+        except ImportError:
+            self.logger.error("sentence-transformers not installed - Multi-HyDE requires cross-encoder!")
+            raise RuntimeError("Multi-HyDE requires sentence-transformers. Install with: pip install sentence-transformers")
 
     def _generate_query_variants_prompt(self, question: str) -> str:
         """
@@ -134,7 +130,7 @@ Example format:
 
         variants = self._parse_query_variants(llm_response, question)
 
-        self.logger.debug(f"Generated variants:")
+        self.logger.debug("Generated variants:")
         for i, variant in enumerate(variants, 1):
             self.logger.debug(f"  {i}. {variant[:80]}...")
 
@@ -275,7 +271,7 @@ Write ONLY the passage, no preamble or explanation.
     def _rerank_with_crossencoder(self, question: str, chunks: List[Dict],
                                   top_k: int) -> List[Dict]:
         """
-        Rerank chunks using cross-encoder with optional section-aware boosting
+        Rerank chunks using cross-encoder with section-aware boosting
 
         Args:
             question: Original user question
@@ -296,18 +292,17 @@ Write ONLY the passage, no preamble or explanation.
         scores = self.cross_encoder.predict(pairs)
 
         # Apply section-aware boost to cross-encoder scores
-        if self.section_booster and self.use_section_boost:
-            self.logger.debug("Applying section-aware boost to cross-encoder scores...")
-            patterns = self.section_booster.get_section_patterns_for_question(question)
-            relevant_indices = self.section_booster.detect_relevant_sections(chunks, patterns)
+        self.logger.debug("Applying section-aware boost to cross-encoder scores...")
+        patterns = self.section_booster.get_section_patterns_for_question(question)
+        relevant_indices = self.section_booster.detect_relevant_sections(chunks, patterns)
 
-            if relevant_indices:
-                self.logger.debug(f"  Boosting {len(relevant_indices)} chunks from relevant sections")
+        if relevant_indices:
+            self.logger.debug(f"  Boosting {len(relevant_indices)} chunks from relevant sections")
 
-            # Apply boost factor (same as baseline: 0.8 → 1.8× multiplier)
-            boost_factor = 0.8
-            for idx in relevant_indices:
-                scores[idx] = scores[idx] * (1 + boost_factor)
+        # Apply boost factor (same as baseline: 0.8 → 1.8× multiplier)
+        boost_factor = 0.8
+        for idx in relevant_indices:
+            scores[idx] = scores[idx] * (1 + boost_factor)
 
         # Rank by boosted scores (descending)
         ranked_indices = np.argsort(scores)[::-1][:top_k]
@@ -358,7 +353,7 @@ Write ONLY the passage, no preamble or explanation.
         Returns:
             Top-k most relevant chunks using Multi-HyDE
         """
-        self.logger.info(f"🔍 Multi-HyDE retrieval (variants={self.num_variants}, k_per_hyp={self.k_per_hypothetical})")
+        self.logger.info(f"Multi-HyDE retrieval (variants={self.num_variants}, k_per_hyp={self.k_per_hypothetical})")
 
         # Step 1: Generate query variants
         query_variants = self.generate_query_variants(question)
