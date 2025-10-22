@@ -1,4 +1,4 @@
-company_name: "capitaland"  # Options: capitaland, dbs, grab, sq
+company_name: "capitaland"  # Options: capitaland, grab, sea, sq, weride
 
 # file Paths
 data_folder: "data"
@@ -10,16 +10,18 @@ question_set_path: "question_set.md"
 pdf_files:
   capitaland: "Capitaland 2024.pdf"
   grab: "Grab 2024.pdf"
-  sq: "SQ 2024.pdf"
   sea: "SEA 2024.pdf"
+  sq: "SQ 2024.pdf"
   weride: "WeRide 2024.pdf"
   tsla: "Tesla 2024.pdf"
 
 embedding_model: "all-MiniLM-L6-v2"
 
+# LLM Configuration
+# Supported providers: "openai" (main), "ollama" (backup/local)
 llm_provider: "openai"
-claude_model: "claude-3-haiku-20240307"
-openai_model: "gpt-4o-mini"
+# openai_model: "gpt-4o-mini"
+openai_model: "gpt-4.1-nano"
 ollama_model: "qwen3:14b"
 ollama_url: "http://localhost:11434"
 
@@ -36,8 +38,7 @@ semantic_chunking:
 
 # Multi-HyDE Configuration
 multi_hyde:
-  enabled: true  # Set to true to enable Multi-HyDE retrieval
-  num_variants: 5  # Number of query variants to generate (paper uses 3-5)
-  k_per_hypothetical: 10  # Top-k chunks to retrieve per hypothetical doc (paper uses 10)
-  use_cross_encoder: true  # Set to true to use cross-encoder for final reranking (slower but more accurate)
-  cross_encoder_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Cross-encoder model for reranking 
+  enabled: true  # Single flag - enables Multi-HyDE for qualitative questions (Q1-9)
+  num_variants: 5
+  k_per_hypothetical: 10
+  cross_encoder_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
