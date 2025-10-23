@@ -236,6 +236,11 @@ class CategoryParser:
         self._add_balance_sheet_keywords(found_terms, keyword_set)
         self._add_cash_flow_keywords(found_terms, keyword_set)
 
+    def _get_business_fundamentals_keywords(self):
+        """Get keywords specifically for Business Fundamentals section"""
+        # Simple keyword to avoid query pollution
+        return 'information on the company'
+
     def extract_keywords_from_questions(self, questions: List[Dict], q_range: range) -> str:
         """Extract financial keywords from question text automatically"""
         financial_terms = self._get_financial_terms()
@@ -245,17 +250,23 @@ class CategoryParser:
         keywords_str = ' '.join(sorted(keyword_set))
         return keywords_str if keywords_str else 'financial data annual report'
 
-    def _build_category_config_entry(self, cat_info: Dict, questions: List[Dict]):
+    def _build_category_config_entry(self, cat_info: Dict, questions: List[Dict], category_name: str):
         """Build single category config entry"""
         q_range = cat_info['range']
-        keywords = self.extract_keywords_from_questions(questions, q_range)
+
+        # Use category-specific keywords for Business Fundamentals
+        if category_name == 'Business Fundamentals':
+            keywords = self._get_business_fundamentals_keywords()
+        else:
+            keywords = self.extract_keywords_from_questions(questions, q_range)
+
         return {'range': q_range, 'keywords': keywords}
 
     def get_categories_config(self, questions: List[Dict]) -> Dict:
         """Get categories with ranges and dynamically extracted keywords"""
         if not self._category_structure:
             self._category_structure = self.parse_question_set_structure()
-        categories_config = {cat_name: self._build_category_config_entry(cat_info, questions)
+        categories_config = {cat_name: self._build_category_config_entry(cat_info, questions, cat_name)
                             for cat_name, cat_info in self._category_structure.items()}
         self.logger.info(f"✓ Built dynamic config for {len(categories_config)} categories")
         return categories_config
