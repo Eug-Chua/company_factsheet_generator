@@ -122,12 +122,22 @@ class FactsheetGenerator:
         self.logger.info(f"{'='*60}")
 
     def _retrieve_semantic_only(self, question: str, chunks: List[Dict], top_k: int):
-        """Retrieve using pure semantic search with section-aware boost"""
-        # Check if Multi-HyDE is enabled in config
+        """Retrieve using pure semantic search with section-aware boost or Multi-HyDE
+
+        Args:
+            question: Question text
+            chunks: Available chunks
+            top_k: Number of chunks to retrieve
+
+        Notes:
+            Uses Multi-HyDE if enabled in config, otherwise uses regular semantic search.
+            Only applies to qualitative questions (Q1-9).
+        """
+        # Check if Multi-HyDE is enabled for qualitative questions
         use_multi_hyde = self.config.config.get('multi_hyde', {}).get('enabled', False)
 
         if use_multi_hyde:
-            self.logger.info("Using Multi-HyDE retrieval...")
+            self.logger.info("Using Multi-HyDE retrieval for qualitative questions...")
             relevant_chunks = self.multi_hyde.retrieve_with_multi_hyde(question, chunks, top_k=top_k)
             self.logger.info(f"Retrieved {len(relevant_chunks)} chunks (Multi-HyDE)")
         else:
@@ -146,10 +156,19 @@ class FactsheetGenerator:
 
     def _retrieve_hybrid(self, keywords: str, question: str, chunks: List[Dict],
                         top_k: int, semantic_top_k: int, bm25_top_k: int):
-        """Retrieve using hybrid search with terminology substitution"""
+        """Retrieve using hybrid search with terminology substitution
+
+        Args:
+            keywords: Keywords for the query
+            question: Question text
+            chunks: Available chunks
+            top_k: Final number of chunks to retrieve
+            semantic_top_k: Number of semantic results
+            bm25_top_k: Number of BM25 results
+        """
         substituted_keywords = self._apply_terminology_substitution(keywords)
         targeted_query = f"{substituted_keywords} {question}"
-        self.logger.info(f"Using HYBRID retrieval (semantic + BM25) for financial data...")
+        self.logger.info("Using HYBRID retrieval (semantic + BM25) for financial data...")
         relevant_chunks = self.retrieve_hybrid(targeted_query, chunks, top_k, semantic_top_k, bm25_top_k)
         self.logger.info(f"Retrieved {len(relevant_chunks)} chunks (RRF merged)")
         return relevant_chunks
@@ -193,10 +212,26 @@ class FactsheetGenerator:
 
     def _retrieve_for_category(self, category_name: str, first_question: str,
                                keywords: str, chunks: List[Dict]):
-        """Retrieve chunks based on category type"""
+        """Retrieve chunks based on category type
+
+        Args:
+            category_name: Name of the category
+            first_question: First question in the category
+            keywords: Keywords for retrieval
+            chunks: Available chunks
+
+        Returns:
+            Retrieved chunks based on category type
+        """
+
         if category_name == "Business Fundamentals":
-            return self._retrieve_semantic_only(first_question, chunks, top_k=50)
-        return self._retrieve_hybrid(keywords, first_question, chunks, top_k=50, semantic_top_k=60, bm25_top_k=60)
+            # Qualitative questions (Q1-9): Can use Multi-HyDE if enabled
+            query = f"{keywords} {first_question}" if keywords else first_question
+            return self._retrieve_semantic_only(query, chunks, top_k=50)
+
+        # Quantitative categories (Q10-60): Always use hybrid retrieval (no Multi-HyDE)
+        return self._retrieve_hybrid(keywords, first_question, chunks, top_k=50,
+                                    semantic_top_k=60, bm25_top_k=60)
 
     def _build_qa_pairs_from_answers(self, category_questions: List[Dict], batch_answers: Dict,
                                      category_name: str, relevant_chunks: List[Dict]):
