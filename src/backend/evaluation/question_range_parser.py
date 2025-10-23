@@ -78,7 +78,7 @@ class QuestionRangeParser:
 
     def load_question_ranges(self):
         """Parse question set file to extract qualitative and quantitative ranges dynamically"""
-        question_set_path = Path(self.config.config['question_set_path'])
+        question_set_path = self.config.question_set_path
         if not question_set_path.exists():
             self.logger.warning(f"Question set file not found: {question_set_path}. Using default ranges.")
             self._set_default_ranges()
