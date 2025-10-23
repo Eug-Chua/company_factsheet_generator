@@ -123,32 +123,33 @@ For calculation questions, ALWAYS:
 4. If data is missing, clearly state what's missing
 5. Do NOT make up numbers
 
-## OUTPUT FORMAT EXAMPLES
+## OUTPUT FORMAT
+Answer each question by number only. Do NOT repeat the question text in your answer.
 
 **QUALITATIVE (with conditional):**
-**Question 3: Does the company disclose government ownership? (Yes/No)**
+3.
 - Yes
 
-**Question 4: If yes to Q3, describe the government relationships:**
+4.
 - Temasek Holdings (sovereign wealth fund) holds 18% stake
 - Two board members: Former Minister of Finance (advisory role), Ex-MAS director
 - No joint ventures with government entities disclosed
 
 **DATA EXTRACTION:**
-**Question 10: What is total revenue for fiscal years 2024, 2023, and 2022?**
+10.
 - 2024: $2,797M, 2023: $2,359M, 2022: $1,433M
 
-**Question 12: What is gross profit for fiscal years 2024, 2023, and 2022?**
+12.
 - Not explicitly stated in financial statements (shows Revenue and Cost of Revenue separately)
 
 **CALCULATION:**
-**Question 39: Calculate gross profit and gross profit margin for 2024, 2023, 2022**
+39.
 - **Formula**: Gross Profit = Revenue - Cost of Revenue; Margin = (Gross Profit / Revenue) × 100%
 - **2024**: $2,797M - $1,623M = $1,174M; Margin = 42.0%
 - **2023**: $2,359M - $1,499M = $860M; Margin = 36.5%
 - **2022**: $1,433M - $1,356M = $77M; Margin = 5.4%
 
-**Question 47: Calculate free cash flow for 2024, 2023, 2022**
+47.
 - **Formula**: FCF = Operating Cash Flow - Capital Expenditure
 - **2024**: $852M - $113M = **$739M**
 - **2023**: $1,187M - $92M = **$1,095M**
@@ -168,8 +169,9 @@ Answer ALL questions using the provided context. Follow the guidelines for each 
                              questions_text=questions_text)
 
     def _parse_with_regex(self, response_text: str):
-        """Parse response using regex pattern"""
-        pattern = r'\*\*Question (\d+):[^\n]*\*\*\s*(.*?)(?=\*\*Question \d+:|\Z)'
+        """Parse response using regex pattern for numbered answers"""
+        # Pattern matches: "3.\n- Answer text" or "3. \n- Answer text"
+        pattern = r'(\d+)\.\s*\n(.*?)(?=\n\d+\.\s*\n|\Z)'
         return re.findall(pattern, response_text, re.DOTALL)
 
     def _convert_matches_to_dict(self, matches):
