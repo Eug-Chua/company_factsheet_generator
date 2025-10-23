@@ -37,7 +37,6 @@ class MultiHyDE:
         self.logger = logger
         self.config = config
         self.section_booster = section_booster
-        self.use_cross_encoder = True
 
         # Multi-HyDE parameters
         self.num_variants = self.config.config.get('multi_hyde', {}).get('num_variants', 5)
