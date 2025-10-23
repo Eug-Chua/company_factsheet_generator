@@ -18,10 +18,16 @@ pdf_files:
 embedding_model: "all-MiniLM-L6-v2"
 
 # LLM Configuration
-# Supported providers: "openai" (main), "ollama" (backup/local)
+# Supported providers: "openai", "anthropic", "ollama"
 llm_provider: "openai"
-# openai_model: "gpt-4o-mini"
-openai_model: "gpt-4.1-nano"
+
+# OpenAI Configuration
+openai_model: "gpt-4o-mini"
+
+# Anthropic Configuration
+anthropic_model: "claude-sonnet-4-5-20250929" 
+
+# Ollama Configuration
 ollama_model: "qwen3:14b"
 ollama_url: "http://localhost:11434"
 
@@ -29,7 +35,7 @@ docling:
   export_format: "markdown"
 
 chunking:
-  min_chunk_size: 200  # Increased to prevent empty header chunks
+  min_chunk_size: 200
   max_chunk_size: 2000
 
 semantic_chunking:
@@ -38,7 +44,7 @@ semantic_chunking:
 
 # Multi-HyDE Configuration
 multi_hyde:
-  enabled: true  # Single flag - enables Multi-HyDE for qualitative questions (Q1-9)
-  num_variants: 5
-  k_per_hypothetical: 10
+  enabled: true               # enable Multi-HyDE for qualitative questions
+  num_variants: 5             # same as the paper
+  k_per_hypothetical: 10      # same as the paper
   cross_encoder_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
