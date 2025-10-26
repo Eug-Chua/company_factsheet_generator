@@ -1,0 +1,50 @@
+[
+  {
+    "id": 0,
+    "section_header": "Business Overview > Company Profile",
+    "header_level": 2,
+    "content": "TechCorp Inc. is a leading technology company specializing in cloud computing and artificial intelligence solutions. Founded in 2010, the company has grown to serve over 5,000 enterprise customers worldwide.",
+    "is_table": false,
+    "contains_numerical_data": true
+  },
+  {
+    "id": 1,
+    "section_header": "Business Overview > Market Position",
+    "header_level": 2,
+    "content": "The company operates in three primary segments:\n- Cloud Infrastructure Services (45% of revenue)\n- AI & Machine Learning Platform (35% of revenue)\n- Enterprise Software Solutions (20% of revenue)",
+    "is_table": false,
+    "contains_numerical_data": true
+  },
+  {
+    "id": 2,
+    "section_header": "Financial Performance > Revenue Analysis",
+    "header_level": 2,
+    "content": "Total revenue for 2024 reached $5.2 billion, representing a 23% year-over-year increase. This growth was driven primarily by strong adoption of our AI platform and expansion in international markets.",
+    "is_table": false,
+    "contains_numerical_data": true
+  },
+  {
+    "id": 3,
+    "section_header": "Financial Performance > Revenue Analysis > Regional Breakdown",
+    "header_level": 3,
+    "content": "| Region | Revenue ($ millions) | YoY Growth |\n|--------|---------------------|------------|\n| North America | 2,600 | 18% |\n| Europe | 1,500 | 25% |\n| Asia Pacific | 950 | 35% |\n| Rest of World | 150 | 12% |",
+    "is_table": true,
+    "contains_numerical_data": true
+  },
+  {
+    "id": 4,
+    "section_header": "Financial Performance > Profitability Metrics",
+    "header_level": 2,
+    "content": "Net income increased to $780 million, up from $620 million in 2023. The improvement reflects operational efficiencies and economies of scale as the business matured.\n\nEBITDA margin expanded to 22% from 19% in the prior year.",
+    "is_table": false,
+    "contains_numerical_data": true
+  },
+  {
+    "id": 5,
+    "section_header": "Risk Management > Key Risk Factors",
+    "header_level": 2,
+    "content": "The company faces several material risks that could impact future performance:\n\n1. Cybersecurity Threats: As a cloud provider, we are a high-value target for cyberattacks\n2. Regulatory Compliance: Increasing data privacy regulations across jurisdictions\n3. Competition: Intense competition from established tech giants and nimble startups",
+    "is_table": false,
+    "contains_numerical_data": false
+  }
+]
