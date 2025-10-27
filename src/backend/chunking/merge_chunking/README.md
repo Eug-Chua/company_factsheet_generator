@@ -23,10 +23,9 @@ ChunkMerger (Orchestrator)
 - Coordinate loading, processing, and saving of chunks
 - Resolve default paths for text and table chunks
 - Calculate merge statistics
-- Provide CLI interface for manual merging
 
 **Key Methods:**
-- `process_and_merge()` - Complete merge pipeline (main entry point)
+- `run()` - Execute complete merge pipeline (main entry point)
 - `_resolve_merge_paths()` - Auto-detect chunk file paths
 - `_merge_and_save()` - Merge chunks and save to file
 - `_finalize_merge_stats()` - Calculate and log statistics
@@ -40,7 +39,7 @@ config = load_config()
 config.set_company('grab')
 
 merger = ChunkMerger(config)
-result = merger.process_and_merge()
+result = merger.run()
 
 # Returns:
 {
@@ -86,16 +85,11 @@ text_chunks = loader.load_chunks(Path('outputs/grab/grab_chunks.json'))
 - `_renumber_chunk_ids()` - Ensure unique IDs
 - `_add_content_type_to_chunks()` - Add metadata
 
-**Renumbering Strategy:**
+**Content Type Metadata:**
 ```python
 # Before merge:
 Text chunks: chunk_id 0, 1, 2, ..., 687
-Table chunks: chunk_id 10000, 10001, 10002, ..., 10247
-
-# Renumbering (to ensure clean sequence):
-Text chunks: chunk_id 0, 1, 2, ..., 687
-Table chunks: chunk_id 10000, 10001, 10002, ..., 10247
-# (Already use offset, so no change needed)
+Table chunks: chunk_id 688, 689, 670, ..., 770
 
 # After merge: Combined list
 [
@@ -103,17 +97,10 @@ Table chunks: chunk_id 10000, 10001, 10002, ..., 10247
     {'chunk_id': 1, 'content_type': 'text', ...},
     ...
     {'chunk_id': 687, 'content_type': 'text', ...},
-    {'chunk_id': 10000, 'content_type': 'table', ...},
-    {'chunk_id': 10001, 'content_type': 'table', ...},
+    {'chunk_id': 688, 'content_type': 'table', ...},
+    {'chunk_id': 689, 'content_type': 'table', ...},
     ...
 ]
-```
-
-**Content Type Metadata:**
-```python
-# Adds 'content_type' field to all chunks
-Text chunk: {'chunk_id': 0, 'content_type': 'text', ...}
-Table chunk: {'chunk_id': 10000, 'content_type': 'table', ...}
 ```
 
 **Missing Table Chunks:**
@@ -134,6 +121,7 @@ if not table_chunks_path.exists():
 
 **Key Methods:**
 - `save_merged_chunks()` - Save chunks to JSON file
+- `_get_default_merged_output_path()` - Get default output path
 - `_prepare_merged_output_path()` - Resolve and create output path
 
 **Output Path Resolution:**
@@ -199,7 +187,7 @@ Text Chunks JSON          Table Chunks JSON
 [ChunkProcessor]
     ├→ Add content_type='text' to all text chunks
     ├→ Add content_type='table' to all table chunks
-    ├→ Renumber IDs (text: 0-687, table: 10000-10247)
+    ├→ Renumber IDs (text: 0-687, table: 688-990)
     └→ Combine into single list
     ↓
 [ChunkSaver]
@@ -218,18 +206,6 @@ Text Chunks JSON          Table Chunks JSON
 
 ## Usage
 
-### CLI Usage
-```bash
-# Merge chunks for specific company
-python -m chunking.merge_chunking.chunk_merger --company grab
-
-# With custom paths
-python -m chunking.merge_chunking.chunk_merger \
-    --company grab \
-    --text-chunks outputs/grab/grab_chunks.json \
-    --table-chunks outputs/grab/grab_table_chunks.json
-```
-
 ### Programmatic Usage
 ```python
 from chunking.merge_chunking.chunk_merger import ChunkMerger
@@ -239,7 +215,7 @@ config = load_config()
 config.set_company('grab')
 
 merger = ChunkMerger(config)
-result = merger.process_and_merge()
+result = merger.run()
 
 print(f"Merged {result['total_chunks']} chunks:")
 print(f"  {result['text_chunks']} text chunks")
@@ -250,7 +226,10 @@ print(f"  Output: {result['output_path']}")
 ### Pipeline Integration
 ```python
 # Called in main pipeline Step 5 (after text and table chunking)
-merge_result = chunk_merger.process_and_merge()
+merge_result = chunk_merger.run(
+    text_chunks_path=text_result['chunks_path'],
+    table_chunks_path=table_result['output_path']
+)
 # Returns: {'total_chunks': 936, 'text_chunks': 688, 'table_chunks': 248, ...}
 ```
 
@@ -282,24 +261,18 @@ merge_result = chunk_merger.process_and_merge()
     "content_type": "text"
   },
   {
-    "chunk_id": 10000,
+    "chunk_id": 688,
     "section_header": "Table 1 (Page 42): 10×5",
     "header_level": 0,
     "content": "| Column1 | Column2 | Column3 |\n|---------|---------|---------|...",
-    "content_type": "table",
-    "table_id": "table_0",
-    "table_page": 42,
-    "table_shape": {"rows": 10, "columns": 5}
+    "content_type": "table"
   },
   {
-    "chunk_id": 10001,
+    "chunk_id": 689,
     "section_header": "Table 2 (Page 45): 50×8 (Part 1)",
     "header_level": 0,
     "content": "| Header1 | Header2 | ... |\n...",
-    "content_type": "table",
-    "table_id": "table_1",
-    "table_page": 45,
-    "table_shape": {"rows": 50, "columns": 8}
+    "content_type": "table"
   }
 ]
 ```
@@ -307,7 +280,6 @@ merge_result = chunk_merger.process_and_merge()
 **Key Features:**
 - **Unified Structure:** All chunks have same base fields
 - **Content Type Metadata:** `content_type` field distinguishes text vs table
-- **Unique IDs:** Text (0-N), Tables (10000+)
 - **Additional Metadata:** Tables retain table_id, table_page, table_shape
 
 ## Configuration
@@ -381,20 +353,6 @@ With merge:
 3. **Unified Format:** All chunks have same structure
 4. **Easier Embedding:** Embed all chunks together
 
-### Why Keep Chunk ID Offset (10000)?
-
-**Problem:** Need to distinguish text from table chunks.
-
-**Solution:** Maintain ID offset from table_extraction.
-```python
-Text chunks: 0-999
-Table chunks: 10000+
-```
-
-**Benefits:**
-1. **Easy Filtering:** `chunk_id < 10000` = text, `>= 10000` = table
-2. **Provenance:** Can trace back to original chunk source
-3. **No Collisions:** Guaranteed unique IDs
 
 ### Why Add content_type Metadata?
 
@@ -443,7 +401,7 @@ if not table_chunks_path.exists():
 
 ## Logging
 
-Merge operations logged to `logs/logs_{timestamp}.log` with prefix `chunk_merger`.
+Merge operations logged to `logs/logs_{num}.log` with prefix `chunk_merger`.
 
 **Key Log Messages:**
 - `"Loaded X chunks from {filename}"` - Load confirmation (2x, text + table)
@@ -461,20 +419,6 @@ Merge operations logged to `logs/logs_{timestamp}.log` with prefix `chunk_merger
 - **Missing Table Chunks:** Logs warning and continues with text chunks only
 - **Empty Chunks:** Handles empty lists gracefully (no division by zero)
 - **Invalid JSON:** Catches and logs JSON parsing errors
-
-## Performance
-
-| Company | Text Chunks | Table Chunks | Processing Time | Memory Usage |
-|---------|-------------|--------------|-----------------|--------------|
-| Grab    | 688         | 248          | <1s             | ~10 MB       |
-| SQ      | 530         | 142          | <1s             | ~8 MB        |
-| SEA     | 498         | 98           | <1s             | ~6 MB        |
-
-**Optimization:**
-- Simple list concatenation (O(n))
-- Minimal memory overhead
-- No LLM calls
-- Fast JSON I/O
 
 ## Dependencies
 

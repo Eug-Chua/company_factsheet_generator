@@ -261,9 +261,9 @@ result = evaluate(
             'average': 0.83
         }
     },
-    'quantitative': {  # Q10-Q57
-        'question_range': '10-57',
-        'num_questions': 48,
+    'quantitative': {  # Q10-Q60
+        'question_range': '10-60',
+        'num_questions': 51,
         'scores': {
             'faithfulness': 0.92,
             'answer_relevancy': 0.94,
@@ -311,7 +311,7 @@ ragas_embeddings = OpenAIEmbeddings(
 qualitative_range = range(1, 10)  # Q1-Q9
 
 # Quantitative questions (Financial data + calculations)
-quantitative_range = range(10, 58)  # Q10-Q57
+quantitative_range = range(10, 61)  # Q10-Q60
 ```
 
 **Key Methods:**
@@ -328,7 +328,7 @@ quantitative_range = range(10, 58)  # Q10-Q57
 Evaluation Summary
 ============================================================
 
-Aggregate Scores (across all 57 questions):
+Aggregate Scores (across all 60 questions):
   Faithfulness:       0.87
   Answer Relevancy:   0.91
   Context Precision:  0.82
@@ -343,7 +343,7 @@ Breakdown by Question Type:
     Context Recall:     0.83
     Average:            0.83
 
-  Quantitative (Q10-Q57):
+  Quantitative (Q10-Q60):
     Faithfulness:       0.92
     Answer Relevancy:   0.94
     Context Precision:  0.88
@@ -435,7 +435,7 @@ evaluation_result = evaluator.evaluate_factsheet()
 {
   "company": "grab",
   "factsheet_path": "outputs/grab/grab_factsheet.md",
-  "num_questions": 57,
+  "num_questions": 60,
   "num_chunks": 612,
   "evaluation_method": "RAGAS",
 
@@ -461,7 +461,7 @@ evaluation_result = evaluator.evaluate_factsheet()
       }
     },
     "quantitative": {
-      "question_range": "10-57",
+      "question_range": "10-60",
       "num_questions": 48,
       "scores": {
         "faithfulness": 0.92,
@@ -502,7 +502,7 @@ evaluation_result = evaluator.evaluate_factsheet()
 # Evaluation settings
 evaluation:
   qualitative_range: [1, 9]   # Q1-Q9
-  quantitative_range: [10, 57] # Q10-Q57
+  quantitative_range: [10, 60] # Q10-Q60
 
 # RAGAS models
 ragas_llm_model: claude-3-5-sonnet-20241022
@@ -578,7 +578,7 @@ Option 2: Use generation chunks (chosen)
 - Harder to judge (typically lower scores)
 - Context precision often lower (info scattered)
 
-**Quantitative (Q10-Q57):**
+**Quantitative (Q10-Q60):**
 - Objective, data-driven answers
 - Exact numbers required
 - Easier to judge (typically higher scores)
@@ -588,7 +588,7 @@ Option 2: Use generation chunks (chosen)
 
 ### Why Parallel Execution?
 
-**Problem:** RAGAS evaluation involves many LLM calls (4 metrics × 57 questions = 228 calls).
+**Problem:** RAGAS evaluation involves many LLM calls (4 metrics × 60 questions = 240 calls).
 
 **Solution:** Parallel execution with 16 workers.
 ```python
@@ -606,18 +606,18 @@ run_config=RunConfig(max_workers=16)
 
 | Company | Questions | Evaluation Time | LLM Calls | Cost    |
 |---------|-----------|-----------------|-----------|---------|
-| Grab    | 57        | ~2 min          | ~228      | $1.50   |
-| SQ      | 57        | ~2 min          | ~228      | $1.50   |
-| SEA     | 57        | ~2 min          | ~228      | $1.50   |
+| Grab    | 60        | ~2 min          | ~228      | $1.50   |
+| SQ      | 60        | ~2 min          | ~228      | $1.50   |
+| SEA     | 60        | ~2 min          | ~228      | $1.50   |
 
 ### Cost Breakdown (Claude 3.5 Sonnet)
 
 | Metric             | Calls | Tokens/Call | Total Tokens | Cost    |
 |--------------------|-------|-------------|--------------|---------|
-| Faithfulness       | 57    | ~1500       | 85K          | $0.65   |
-| Answer Relevancy   | 57    | ~800        | 46K          | $0.35   |
-| Context Precision  | 57    | ~1200       | 68K          | $0.50   |
-| Context Recall     | 57    | ~1000       | 57K          | $0.43   |
+| Faithfulness       | 60    | ~1500       | 85K          | $0.65   |
+| Answer Relevancy   | 60    | ~800        | 46K          | $0.35   |
+| Context Precision  | 60    | ~1200       | 68K          | $0.50   |
+| Context Recall     | 60    | ~1000       | 57K          | $0.43   |
 | **Total**          | 228   | —           | 256K         | **$1.93** |
 
 ### Bottleneck
@@ -645,14 +645,14 @@ run_config=RunConfig(max_workers=16)
 - Lower context precision (info scattered)
 - Lower faithfulness (more interpretive)
 
-**Quantitative (Q10-Q57):**
+**Quantitative (Q10-Q60):**
 - Typical: 0.88 - 0.95
 - Higher context precision (specific data)
 - Higher faithfulness (exact numbers)
 
 ## Logging
 
-Evaluation operations logged to `logs/logs_{timestamp}.log` with prefix `evaluation`.
+Evaluation operations logged to `logs/logs_{num}.log` with prefix `evaluation`.
 
 **Key Log Messages:**
 - `"Loaded X QA pairs with retrieved chunks"` - Data loading

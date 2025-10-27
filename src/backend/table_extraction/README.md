@@ -7,63 +7,47 @@ Converts structured tables from PDF extraction into **RAG-ready chunks** for ret
 ## Architecture
 
 ```
-NumericalExtractor (Orchestrator)
-├── TableLoader → Load tables from JSON, provide access
-├── TableSearcher → Search tables, extract numerical values
-└── TableChunker → Convert tables to RAG-ready chunks
+NumericalExtractor (Initializer)
+├── loader (TableLoader) → Load tables from JSON
+└── chunker (TableChunker) → Convert tables to RAG-ready chunks
+
+Usage:
+extractor.chunker.process_tables_to_chunks()
 ```
 
 ## Components
 
 ### 1. `table_extractor.py`
-**Main orchestrator** for table processing pipeline.
+**Lightweight orchestrator** that initializes table processing components.
 
 **Key Responsibilities:**
-- Coordinates loading, searching, and chunking operations
-- Delegates to specialized components (loader, searcher, chunker)
-- Provides unified interface for table operations
-- Supports CLI for testing and manual exploration
+- Initialize and expose two specialized components: `loader`, `chunker`
+- Components are accessed directly (no wrapper methods)
 
-**Key Methods:**
-- `load_tables()` - Load tables from JSON file
-- `search_tables_by_keyword()` - Find tables containing keyword
-- `extract_financial_metrics()` - Extract specific metrics across all tables
-- `create_table_chunks()` - Convert tables to RAG chunks
-- `process_tables_to_chunks()` - Complete pipeline (load → chunk → save)
+**Public Components:**
+- `loader` - TableLoader instance for loading tables from JSON
+- `chunker` - TableChunker instance for converting tables to chunks
 
-**CLI Usage:**
-```bash
-# Load and summarize tables
-python -m table_extraction.table_extractor --company grab
-
-# Search for tables containing keyword
-python -m table_extraction.table_extractor --company grab --search "revenue"
-
-# Extract specific metrics
-python -m table_extraction.table_extractor --company grab --metrics revenue profit assets
-
-# Export all tables to CSV
-python -m table_extraction.table_extractor --company grab --export
-```
+**Design Note:** Direct component access (no wrappers) reduces indirection and makes the code more maintainable.
 
 ### 2. `table_loader.py`
-**Loads and provides access to table data from JSON files.**
+**Loads table data from JSON files.**
 
 **Key Responsibilities:**
 - Load tables JSON from conversion output
-- Provide access to tables by ID
-- Convert tables to pandas DataFrames
-- Export tables to CSV files
+- Store tables data for chunker to process
 
 **Table JSON Structure (Input):**
 ```json
 {
   "table_0": {
-    "dataframe": [[row1], [row2], ...],
-    "markdown": "| Col1 | Col2 |\n|------|------|\n| val1 | val2 |",
-    "csv": "Col1,Col2\nval1,val2",
-    "shape": {"rows": 10, "columns": 5},
-    "location": {"page": 42, "bbox": [...]}
+    "dataframe": [
+      {"Col1": "val1", "Col2": "val2"},
+      {"Col1": "val3", "Col2": "val4"}
+    ],
+    "markdown": "| Col1 | Col2 |\n|------|------|\n| val1 | val2 |\n| val3 | val4 |",
+    "shape": {"rows": 2, "columns": 2},
+    "location": {"page": 3}
   },
   "table_1": {...}
 }
@@ -71,11 +55,6 @@ python -m table_extraction.table_extractor --company grab --export
 
 **Key Methods:**
 - `load_tables()` - Load tables from JSON file
-- `get_table_list()` - Get list of all tables with metadata
-- `get_table_by_id()` - Get specific table as DataFrame
-- `get_table_markdown()` - Get table as markdown string
-- `get_table_summary()` - Get summary of all loaded tables
-- `export_all_tables_to_csv()` - Export all tables to CSV files
 
 **Auto-Detection:**
 ```python
@@ -84,78 +63,25 @@ python -m table_extraction.table_extractor --company grab --export
 tables_path = self._auto_detect_tables_path()
 ```
 
-### 3. `table_searcher.py`
-**Searches tables and extracts numerical values.**
-
-**Key Responsibilities:**
-- Search tables by keyword (case-sensitive or not)
-- Extract specific numerical values from tables
-- Find financial metrics across all tables
-- Handle row/column keyword matching
-
-**Key Methods:**
-- `search_tables_by_keyword()` - Find all tables containing keyword
-- `extract_numerical_value()` - Extract specific value from table
-- `extract_financial_metrics()` - Extract metrics across all tables
-
-**Search Example:**
-```python
-# Find all tables with "revenue" keyword
-results = searcher.search_tables_by_keyword("revenue")
-# Returns: [{'table_id': 'table_12', 'page': 45, 'dataframe': ...}, ...]
-
-# Extract specific value
-value = searcher.extract_numerical_value(
-    table_id="table_12",
-    row_keyword="Total Revenue",
-    col_keyword="2024"
-)
-# Returns: "45,678" (from cell matching row and column)
-```
-
-**Financial Metrics Extraction:**
-```python
-# Extract common metrics across all tables
-metrics = searcher.extract_financial_metrics(["revenue", "profit", "assets"])
-# Returns:
-{
-  "revenue": [
-    {'table_id': 'table_12', 'page': 45, 'value': '45,678', 'context': 'Total Revenue'},
-    {'table_id': 'table_23', 'page': 67, 'value': '12,345', 'context': 'Revenue Growth'}
-  ],
-  "profit": [...],
-  "assets": [...]
-}
-```
-
-**Value Extraction Logic:**
-1. Find rows matching row_keyword (case-insensitive)
-2. If col_keyword provided, find column matching col_keyword
-3. If no col_keyword, extract first numeric value in row
-4. Handle numeric columns and string values with numbers
-
-### 4. `table_chunker.py`
+### 3. `table_chunker.py`
 **Converts tables to RAG-ready chunks.**
 
 **Key Responsibilities:**
 - Convert tables to markdown-formatted chunks
 - Handle large tables by splitting into multiple chunks
 - Preserve table headers across split chunks
-- Generate unique chunk IDs (starting at 10000)
+- Generate sequential chunk IDs (starting at 0)
 
 **Chunking Strategy:**
 
 **Small Table (≤ max_chunk_size):**
 ```json
 {
-  "chunk_id": 10000,
+  "chunk_id": 0,
   "section_header": "Table 1 (Page 42): 10×5",
   "header_level": 0,
   "content": "| Col1 | Col2 |\n|------|------|\n| val1 | val2 |",
-  "content_type": "table",
-  "table_id": "table_0",
-  "table_page": 42,
-  "table_shape": {"rows": 10, "columns": 5}
+  "content_type": "table"
 }
 ```
 
@@ -191,36 +117,33 @@ Chunk 3 (Part 3):
 ```
 
 **Key Methods:**
-- `create_table_chunks()` - Convert all tables to chunks
+- `create_table_chunks()` - Convert all tables to chunks (IDs start at 0)
 - `save_table_chunks()` - Save chunks to JSON file
 - `process_tables_to_chunks()` - Complete pipeline (load → chunk → save)
 
-**Chunk ID Offset:**
-```python
-chunk_id_offset = 10000  # Avoids collision with text chunks (0-1000)
-```
-- Text chunks: 0-999
-- Table chunks: 10000+
-- Ensures unique IDs when merging text and table chunks
+**Chunk ID Management:**
+- Table chunks are created with IDs starting at 0
+- During merge (in `chunking/merge_chunking/`), IDs are renumbered sequentially:
+  - Text chunks: 0, 1, 2, ..., N
+  - Table chunks: N+1, N+2, N+3, ...
+- This ensures unique sequential IDs across all chunks
 
 **Header Preservation:**
-```python
-# First 2 lines + separator line constitute header
-def _is_header_line(self, line: str, index: int) -> bool:
-    return index < 2 or line.startswith('|---')
-```
+- First 2 lines + separator line (|---|) constitute the header
+- When splitting large tables, each chunk gets a complete header
+- This preserves column context in every chunk part
 
 ## Data Flow
 
 ```
 Tables JSON (from conversion/)
     ↓
-[TableLoader]
+[NumericalExtractor.loader]
     ├→ Load JSON file
     ├→ Parse table metadata
     └→ Provide DataFrame access
     ↓
-[TableChunker]
+[NumericalExtractor.chunker]
     ├→ Process each table
     ├→ Check size vs max_chunk_size
     ├→ Split large tables (preserving header)
@@ -233,21 +156,6 @@ Tables JSON (from conversion/)
 
 ## Usage
 
-### CLI Usage
-```bash
-# Create table chunks for specific company
-python -m table_extraction.table_extractor --company grab
-
-# Search tables before chunking
-python -m table_extraction.table_extractor --company grab --search "balance sheet"
-
-# Extract specific metrics
-python -m table_extraction.table_extractor --company grab --metrics revenue ebitda assets
-
-# Export tables to CSV
-python -m table_extraction.table_extractor --company grab --export
-```
-
 ### Programmatic Usage
 ```python
 from table_extraction.table_extractor import NumericalExtractor
@@ -259,8 +167,7 @@ config.set_company('grab')
 extractor = NumericalExtractor(config)
 
 # Complete pipeline: load tables → create chunks → save
-result = extractor.process_tables_to_chunks()
-
+result = extractor.chunker.process_tables_to_chunks()
 print(f"Extracted {result['num_tables']} tables")
 print(f"Created {result['num_chunks']} chunks")
 print(f"Average chunk size: {result['avg_chunk_size']:.0f} chars")
@@ -270,7 +177,7 @@ print(f"Output: {result['output_path']}")
 ### Pipeline Integration
 ```python
 # Called in main pipeline Step 4 (parallel with text chunking)
-table_result = numerical_extractor.process_tables_to_chunks()
+table_result = numerical_extractor.chunker.process_tables_to_chunks()
 # Returns: {'num_tables': 145, 'num_chunks': 248, 'avg_chunk_size': 1523.5, 'output_path': Path}
 ```
 
@@ -280,56 +187,37 @@ table_result = numerical_extractor.process_tables_to_chunks()
 ```json
 [
   {
-    "chunk_id": 10000,
+    "chunk_id": 0,
     "section_header": "Table 1 (Page 42): 10×5",
     "header_level": 0,
     "content": "| Column1 | Column2 | Column3 |\n|---------|---------|---------|...",
-    "content_type": "table",
-    "table_id": "table_0",
-    "table_page": 42,
-    "table_shape": {
-      "rows": 10,
-      "columns": 5
-    }
+    "content_type": "table"
   },
   {
-    "chunk_id": 10001,
+    "chunk_id": 1,
     "section_header": "Table 2 (Page 45): 50×8 (Part 1)",
     "header_level": 0,
     "content": "| Header1 | Header2 | ... |\n...",
-    "content_type": "table",
-    "table_id": "table_1",
-    "table_page": 45,
-    "table_shape": {
-      "rows": 50,
-      "columns": 8
-    }
+    "content_type": "table"
   },
   {
-    "chunk_id": 10002,
+    "chunk_id": 2,
     "section_header": "Table 2 (Page 45): 50×8 (Part 2)",
     "header_level": 0,
     "content": "| Header1 | Header2 | ... |\n...",
-    "content_type": "table",
-    "table_id": "table_1",
-    "table_page": 45,
-    "table_shape": {
-      "rows": 50,
-      "columns": 8
-    }
+    "content_type": "table"
   }
 ]
 ```
 
 **Chunk Structure Fields:**
-- `chunk_id` - Unique ID starting at 10000
-- `section_header` - Descriptive header with page and shape
+- `chunk_id` - Sequential ID starting at 0 (renumbered during merge)
+- `section_header` - Descriptive header with page and shape (e.g., "Table 1 (Page 42): 10×5")
 - `header_level` - Always 0 for tables
 - `content` - Markdown table representation
 - `content_type` - Always "table"
-- `table_id` - Original table ID from tables JSON
-- `table_page` - Page number where table appears
-- `table_shape` - Original table dimensions (rows × columns)
+
+**Note:** Page and shape information are embedded in the `section_header` field for display purposes. The original table metadata (table_id, page, shape) is not stored in chunks as it's not needed for retrieval or generation.
 
 ## Configuration
 
@@ -379,25 +267,9 @@ Table chunk: Structured data with rows/columns
 
 **Solution:** Process tables separately, then merge.
 1. **Better Formatting:** Preserve table structure in markdown
-2. **Metadata:** Include table_id, page, shape for provenance
+2. **Context in Headers:** Include page and shape info in section_header for readability
 3. **Splitting Logic:** Split by rows (not paragraphs)
 4. **Header Preservation:** Repeat headers in split chunks
-
-### Why Start Chunk IDs at 10000?
-
-**Problem:** Chunk ID collision when merging text and table chunks.
-```
-Text chunks: chunk_id 0, 1, 2, ..., 688
-Table chunks: chunk_id 0, 1, 2, ..., 248
-→ Collision when merged!
-```
-
-**Solution:** Offset table chunk IDs.
-```
-Text chunks: chunk_id 0, 1, 2, ..., 688
-Table chunks: chunk_id 10000, 10001, 10002, ..., 10248
-→ No collision when merged!
-```
 
 ### Why Preserve Headers in Split Tables?
 
@@ -454,7 +326,7 @@ Chunk 2 (Part 2):
 
 ## Logging
 
-Table extraction operations logged to `logs/logs_{timestamp}.log` with prefix `numerical_extraction`.
+Table extraction operations logged to `logs/logs_{num}.log` with prefix `numerical_extraction`.
 
 **Key Log Messages:**
 - `"Loading tables from: {path}"` - Start
@@ -485,7 +357,7 @@ Table extraction operations logged to `logs/logs_{timestamp}.log` with prefix `n
 
 ## Dependencies
 
-- `pandas` - DataFrame manipulation and CSV export
+- `pandas` - DataFrame manipulation
 - `json` - JSON loading and saving
 - `pathlib` - Path handling
 - `re` - Numerical value extraction

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Extracts and chunks markdown content with **hierarchical structure preservation** for RAG retrieval. Transforms flat markdown into structured chunks that maintain document hierarchy (sections, subsections).
+Extracts and chunks markdown content with adaptive section-aware chunking that preserves document structure and table integrity for RAG retrieval.
 
 ## Architecture
 
@@ -16,18 +16,18 @@ MarkdownExtractor (Orchestrator)
 ## Components
 
 ### 1. `extractor.py`
-**Main orchestrator** for hierarchical markdown chunking.
+**Main orchestrator** for adaptive section-aware markdown chunking.
 
 **Processing Pipeline:**
 1. **Clean Markdown** - Remove artifacts, normalize spacing
-2. **Analyze Structure** - Find headers, build hierarchy
+2. **Analyze Structure** - Find headers, build section hierarchy
 3. **Extract Preamble** - Content before first header (if substantial)
-4. **Process Sections** - Chunk each section with hierarchy preserved
-5. **Save Chunks** - Output hierarchical chunk JSON
+4. **Process Sections** - Chunk each section with section context preserved
+5. **Save Chunks** - Output structured chunk JSON
 
 **Key Methods:**
 - `process_markdown_file()` - Complete pipeline (main entry point)
-- `extract_hierarchical_chunks()` - Core chunking logic
+- `extract_hierarchical_chunks()` - Core chunking logic with section context
 - `clean_markdown_artifacts()` - Preprocessing step
 
 **Configuration:**
@@ -75,37 +75,37 @@ Too many newlines
 ```
 
 ### 3. `structure_analyzer.py`
-**Parses markdown structure and builds hierarchy.**
+**Parses markdown structure and builds section context.**
 
 **Header Detection:**
 ```markdown
 # Level 1
 ## Level 2
-### Level 3
+### Level 3 (rare in annual reports)
 ```
 
-**Hierarchy Building:**
+**Section Context Building:**
 ```python
-# For: "Parent > Child > Grandchild > Current"
+# For a document with nested headers:
 headers = [
-    {'level': 1, 'text': 'Parent', 'start_pos': 0},
-    {'level': 2, 'text': 'Child', 'start_pos': 100},
-    {'level': 3, 'text': 'Grandchild', 'start_pos': 200},
-    {'level': 3, 'text': 'Current', 'start_pos': 300}
+    {'level': 1, 'text': 'Financial Statements', 'start_pos': 0},
+    {'level': 2, 'text': 'Balance Sheet', 'start_pos': 100},
 ]
 
-# build_header_stack(headers, 3) returns:
-"Parent > Child > Grandchild > Current"
+# build_header_stack(headers, 1) returns:
+"Financial Statements > Balance Sheet"
+
+# Note: Most annual reports have 1-2 levels, not deep hierarchies
 ```
 
 **Key Methods:**
 - `find_headers()` - Extract all headers with positions
-- `build_header_stack()` - Generate full hierarchical path
+- `build_header_stack()` - Generate section path from parent headers
 - `get_section_content()` - Extract content between headers
 
 **Section Content Extraction:**
 - Gets text from current header to next header of same/higher level
-- Handles nested sections correctly
+- Handles nested sections when they exist
 - Excludes header text itself
 
 ### 4. `content_chunker.py`
@@ -123,12 +123,23 @@ headers = [
 ```json
 {
   "chunk_id": 0,
-  "section_header": "Business Overview > Financial Performance",
+  "section_header": "Financial Performance",
   "header_level": 2,
-  "content": "Actual text content...",
+  "content": "Revenue for the year increased by 15% to $5.4 billion...",
   "content_type": "text",
   "is_table": false,
-  "contains_numerical_data": false
+  "contains_numerical_data": true
+}
+```
+
+**With parent context (when nested headers exist):**
+```json
+{
+  "chunk_id": 5,
+  "section_header": "Financial Statements > Balance Sheet",
+  "header_level": 2,
+  "content": "Total assets as of December 31, 2024...",
+  "content_type": "text"
 }
 ```
 
@@ -139,15 +150,16 @@ headers = [
 
 **Chunking Example:**
 ```
+Section: "Risk Factors"
 Content: 5000 characters
 max_chunk_size: 2000
 
 Split by paragraphs:
   - Paragraph 1: 1800 chars ✓ (< 2000)
-  - Paragraph 2: 2400 chars ✗ (> 2000) → split by sentences
+  - Paragraph 2: 2400 chars ✗ (> 2000) → split by lines
   - Paragraph 3: 1600 chars ✓ (< 2000)
 
-Result: 4 chunks with hierarchical headers
+Result: 4 chunks, all with section_header: "Risk Factors"
 ```
 
 ## Data Flow
@@ -172,8 +184,8 @@ Markdown File
 [Process Each Section]
     ├→ Get section content
     ├→ Check if ≥ min_chunk_size
-    ├→ Split into chunks
-    └→ Attach hierarchical header
+    ├→ Split into chunks (respecting tables/paragraphs)
+    └→ Attach section header context
     ↓
 [Save Chunks]
     └→ {company}_chunks.json
@@ -189,8 +201,8 @@ python -m extraction.extractor --company grab
 # With custom markdown file
 python -m extraction.extractor --company grab --markdown path/to/file.md
 
-# With semantic merging (optional)
-python -m extraction.extractor --company grab --semantic
+# With custom config file
+python -m extraction.extractor --company grab --config path/to/config.yaml
 ```
 
 ### Programmatic Usage
@@ -223,33 +235,35 @@ extraction_result = extractor.process_markdown_file(markdown_path)
 [
   {
     "chunk_id": 0,
-    "section_header": "Preamble",
-    "header_level": 0,
-    "content": "Executive summary content before first header...",
-    "content_type": "text",
-    "is_table": false,
-    "contains_numerical_data": false
-  },
-  {
-    "chunk_id": 1,
-    "section_header": "Business Overview",
-    "header_level": 1,
-    "content": "The company operates in three segments...",
-    "content_type": "text",
-    "is_table": false,
-    "contains_numerical_data": false
-  },
-  {
-    "chunk_id": 2,
-    "section_header": "Business Overview > Financial Performance",
+    "section_header": "FORM 20-F",
     "header_level": 2,
-    "content": "Revenue for FY2024 increased by 15%...",
+    "content": "ANNUAL REPORT PURSUANT TO SECTION 13...",
     "content_type": "text",
     "is_table": false,
     "contains_numerical_data": false
+  },
+  {
+    "chunk_id": 15,
+    "section_header": "Business Overview",
+    "header_level": 2,
+    "content": "The company operates in three primary segments: deliveries, mobility, and financial services...",
+    "content_type": "text",
+    "is_table": false,
+    "contains_numerical_data": false
+  },
+  {
+    "chunk_id": 42,
+    "section_header": "Financial Statements > Balance Sheet",
+    "header_level": 2,
+    "content": "Total assets as of December 31, 2024 were $8.2 billion...",
+    "content_type": "text",
+    "is_table": false,
+    "contains_numerical_data": true
   }
 ]
 ```
+
+**Note:** Most chunks have flat headers (single level). Nested headers (with " > ") appear occasionally when the document structure supports it.
 
 ## Configuration
 
@@ -278,19 +292,24 @@ outputs/
 
 ## Design Decisions
 
-### Why Hierarchical Structure?
+### Why Section Context?
 
-**Problem:** Flat chunks lose context.
+**Problem:** Flat chunks lose basic context.
 ```
 Chunk: "Revenue increased 15%"
-Question: "Where?" "Which segment?"
+Question: Which report section is this from?
 ```
 
-**Solution:** Hierarchical headers provide context.
+**Solution:** Include section headers for basic orientation.
 ```
-Chunk: "Business Overview > Asia Pacific > Revenue increased 15%"
-Answer: Revenue increased 15% in Asia Pacific segment.
+Chunk: "Financial Performance > Revenue increased 15%"
+Context: From the Financial Performance section
 ```
+
+**Reality Check:**
+- Most annual reports have 1-2 header levels (# and ##)
+- Deep hierarchies (###, ####) are rare
+- Section headers provide basic context, not rich semantic hierarchies
 
 ### Why Variable Chunk Sizes?
 
@@ -307,6 +326,23 @@ Chunk 1: "The company's primary strategy is to expand into emerging markets thro
 Chunk 2: "Market Entry Timeline: Q1 2024..."
 ```
 → Respects natural boundaries
+
+### Why Preserve Table Integrity?
+
+**Problem:** Tables split across chunks lose meaning.
+```
+Chunk 1: | Revenue | 2024 |
+Chunk 2: | 5,372   | 4,835 |
+```
+→ Broken table structure, uninterpretable
+
+**Solution:** Treat tables as atomic units.
+```
+Chunk: Full table with headers and all rows
+| Revenue | 2024  | 2023  |
+| 5,372   | 4,835 | 1,433 |
+```
+→ Complete structured data, ready for extraction
 
 ### Chunk Size Parameters
 
@@ -327,34 +363,47 @@ Chunk 2: "Market Entry Timeline: Q1 2024..."
 | SQ      | 252   | 812 KB        | 530    | 1445 chars     | ~0.8s           |
 | SEA     | 229   | 743 KB        | 498    | 1402 chars     | ~0.7s           |
 
-## Hierarchical Header Examples
+## Real Section Header Examples
 
-### Real Examples from Grab Annual Report:
+From actual processed annual reports:
+
+**Flat structures (most common):**
 ```
-"Preamble"
 "Table of Contents"
 "Risk Factors"
-"Risk Factors > Risks Relating to Our Business"
-"Risk Factors > Risks Relating to Our Business > Competitive Risks"
 "Financial Statements"
-"Financial Statements > Consolidated Balance Sheet"
-"Financial Statements > Consolidated Balance Sheet > Assets"
+"Business Overview"
+"CONVENTIONS AND FREQUENTLY USED TERMS"
 ```
+
+**Two-level hierarchies (occasional):**
+```
+"Portions of this exhibit... > Opinion on the Consolidated Financial Statements"
+"Portions of this exhibit... > Basis for Opinion"
+"Less than $1 million > Significant non-cash transactions"
+"Table of Contents > Key Operating Metrics"
+```
+
+**Why mostly flat?**
+Annual reports typically use:
+- Few top-level sections (# headers)
+- Many flat subsections (## headers)
+- Rarely 3+ levels deep
 
 ### Benefits for Retrieval:
 1. **Section Filtering:** Can boost/filter by section keywords
-2. **Context Preservation:** LLM knows which section chunk came from
-3. **Hierarchical Search:** Can search within specific report sections
+2. **Basic Context:** LLM knows which section chunk came from
+3. **Section Search:** Can search within specific report sections
 4. **Better Prompts:** Can tell LLM "From the Risk Factors section..."
 
 ## Logging
 
-Extraction operations logged to `logs/logs_{timestamp}.log` with prefix `extraction`.
+Extraction operations logged to `logs/logs_{num}.log` with prefix `extraction`.
 
 **Key Log Messages:**
-- `"Extracting hierarchical chunks..."` - Start
-- `"Extracted X chunks with hierarchical structure"` - Success
-- `"Processing: Parent > Child > Current (Level 3)"` - Section processing
+- `"Extracting hierarchical chunks..."` - Start of chunking process
+- `"Extracted X chunks with hierarchical structure"` - Chunking complete
+- `"Processing: Section Name (Level 2)"` - Section processing
 - `"✓ Saved X chunks to: {path}"` - Output confirmation
 
 ## Error Handling
@@ -380,14 +429,11 @@ Extraction operations logged to `logs/logs_{timestamp}.log` with prefix `extract
 
 ## Related Modules
 
-- **Previous Step:** `conversion/` - Markdown generation
-- **Next Step:** `table_extraction/` - Table chunks (parallel)
+- **Previous Step:** `conversion/` - Markdown generation from PDF
+- **Next Step:** `table_extraction/` - Table chunks (runs in parallel)
 - **Then:** `chunking/merge_chunking/` - Merge text + table chunks
+- **Then:** `chunking/semantic_chunking/` - Semantic similarity-based merging
+- **Finally:** `generation/` - RAG-based factsheet generation
 - **Outputs to:** `outputs/{company}/{company}_chunks.json`
 
-## Future Enhancements
-
-- **Semantic Boundary Detection:** Use embeddings to find better split points
-- **List Handling:** Special handling for bulleted/numbered lists
-- **Table Detection:** Flag chunks containing inline tables
-- **Overlap:** Add configurable chunk overlap for context continuity
+**Note:** This module only handles initial text chunking. Semantic merging happens later in the main pipeline (Step 6).

@@ -4,6 +4,8 @@
 
 The conversion module handles PDF to Markdown transformation using a **2-pass extraction system** powered by Docling. It extracts both textual content and structured table data from annual report PDFs.
 
+**Alternative Converter:** `mineru_converter.py` provides ML-based conversion using MinerU with GPU support, LaTeX formulas, and multi-language capabilities. See [FEATURES.md](FEATURES.md) for detailed comparison.
+
 ## Architecture
 
 ```
@@ -14,7 +16,7 @@ MarkdownConverter (Orchestrator)
 
 ## Components
 
-### 1. `markdown_converter.py`
+### 1. `markdown_converter.py` (Primary - Docling-based)
 **Main orchestrator** for the 2-pass PDF extraction system.
 
 **Key Responsibilities:**
@@ -52,7 +54,54 @@ PdfPipelineOptions(
 
 **Output:** Clean markdown text optimized for text chunking.
 
-### 3. `table_processor.py`
+### 3. `mineru_converter.py` (Alternative - MinerU-based)
+**Alternative ML-based converter** for advanced use cases.
+
+**Purpose:** Provides GPU-accelerated, ML-based PDF conversion with enhanced capabilities.
+
+**Key Features:**
+- Multi-backend support: 'pipeline' (CPU, fast) or 'vlm' (GPU, accurate)
+- Multi-language support (English, Chinese variants)
+- LaTeX formula detection and extraction
+- Rich output: markdown, tables JSON, bounding boxes, images
+- Automatic model management
+
+**Configuration:**
+```python
+MinerUConverter(
+    backend='pipeline',        # or 'vlm' for GPU
+    lang='en',                 # or 'ch', 'auto'
+    formula_enable=True,       # LaTeX formulas
+    table_enable=True          # Table extraction
+)
+```
+
+**When to Use:**
+- Documents with mathematical formulas
+- Non-English documents (especially Chinese)
+- Need for visual layout analysis
+- GPU resources available for higher accuracy
+
+**CLI Usage:**
+```bash
+# Fast CPU processing
+python mineru_converter.py --company grab
+
+# GPU-accelerated for accuracy
+python mineru_converter.py --company grab --backend vlm
+
+# Chinese documents
+python mineru_converter.py --company capitaland --lang ch
+```
+
+**Output Files:**
+- `{company}.md` - Markdown text
+- `content_list.json` - Tables and structure
+- Layout visualizations and table images
+
+See [FEATURES.md](FEATURES.md) for detailed comparison with Docling.
+
+### 4. `table_processor.py`
 **Pass 2: Table Extraction**
 
 **Purpose:** Extract structured table data with precise cell matching.
@@ -72,20 +121,19 @@ PdfPipelineOptions(
 - `extract_tables()` - Extract all tables from PDF
 - `_process_single_table()` - Convert table to multiple formats
 - `_convert_to_dataframe()` - Table → pandas DataFrame
-- `_format_table_outputs()` - Generate markdown, CSV, and JSON representations
+- `_format_table_outputs()` - Generate markdown and JSON representations
 
 **Table Output Structure:**
 ```json
 {
   "table_0": {
-    "dataframe": [...],        // Row-wise data
-    "markdown": "...",         // Markdown table format
-    "csv": "...",             // CSV format
-    "shape": [rows, cols],    // Dimensions
-    "location": {             // Position in PDF
-      "page": 1,
-      "bbox": [...]
-    }
+    "dataframe": [
+      {"Col1": "val1", "Col2": "val2"},
+      {"Col1": "val3", "Col2": "val4"}
+    ],
+    "markdown": "| Col1 | Col2 |\n|------|------|\n| val1 | val2 |\n| val3 | val4 |",
+    "shape": {"rows": 2, "columns": 2},
+    "location": {"page": 3}
   }
 }
 ```
@@ -103,7 +151,7 @@ PDF Input
 [Pass 2: Table Extraction]
     ├→ Accurate table structure detection
     ├→ Cell matching and parsing
-    ├→ Multi-format export (DataFrame, markdown, CSV)
+    ├→ Multi-format export (DataFrame, markdown)
     └→ Output: {company}_tables.json
 ```
 
@@ -169,7 +217,7 @@ markdown_files/
 
 - **Best-in-class PDF parsing** for financial documents
 - **Accurate table extraction** with cell-level matching
-- **Multi-format output** (markdown, JSON, CSV)
+- **Multi-format output** (markdown, JSON)
 - **Page-aware processing** maintains document structure
 
 ## Performance
@@ -182,7 +230,7 @@ markdown_files/
 
 ## Logging
 
-Conversion operations are logged to `logs/logs_{timestamp}.log` with the prefix `conversion`.
+Conversion operations are logged to `logs/logs_{num}.log`.
 
 **Key Log Messages:**
 - `"Initializing 2-pass extraction system..."` - Startup

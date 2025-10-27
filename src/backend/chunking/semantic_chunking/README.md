@@ -27,8 +27,8 @@ SemanticChunker (Orchestrator)
 - Save merged chunks and generate statistics
 
 **Key Methods:**
+- `run()` - Execute complete semantic chunking pipeline (main entry point)
 - `process_markdown()` - Complete pipeline: Markdown → Basic Chunks → Semantic Merging
-- `merge_chunks()` - Load chunks from file and apply semantic merging
 - `_merge_similar_chunks()` - Core merging logic
 
 **Configuration:**
@@ -53,7 +53,7 @@ chunker = SemanticChunker(
 )
 
 # Option 1: From existing chunks file
-result = chunker.merge_chunks(chunks_path)
+result = chunker.run(chunks_path)
 
 # Option 2: Complete pipeline from markdown
 result = chunker.process_markdown(markdown_path)
@@ -344,20 +344,6 @@ Basic Chunks JSON
 
 ## Usage
 
-### CLI Usage
-```bash
-# Semantic merge from chunks file
-python -m chunking.semantic_chunking.semantic_chunker \
-    --chunks outputs/grab/grab_chunks.json \
-    --threshold 0.70 \
-    --max-size 3000
-
-# Custom output path
-python -m chunking.semantic_chunking.semantic_chunker \
-    --chunks outputs/grab/grab_chunks.json \
-    --output outputs/grab/grab_chunks_semantic_custom.json
-```
-
 ### Programmatic Usage
 ```python
 from chunking.semantic_chunking.semantic_chunker import SemanticChunker
@@ -370,7 +356,7 @@ chunker = SemanticChunker(
 )
 
 # Merge chunks from file
-result = chunker.merge_chunks(
+result = chunker.run(
     chunks_path=Path('outputs/grab/grab_chunks.json')
 )
 
@@ -384,11 +370,11 @@ print(f"Average chunk size: {result['avg_chunk_size']} chars")
 
 # Option 1: After basic text chunking
 extraction_result = extractor.process_markdown_file()
-semantic_result = semantic_chunker.merge_chunks(extraction_result['chunks_path'])
+semantic_result = semantic_chunker.run(extraction_result['chunks_path'])
 
 # Option 2: After text + table merge
-merge_result = chunk_merger.process_and_merge()
-semantic_result = semantic_chunker.merge_chunks(merge_result['output_path'])
+merge_result = chunk_merger.run()
+semantic_result = semantic_chunker.run(merge_result['output_path'])
 
 # semantic_result: {'num_chunks': 456, 'reduction_pct': 33.7, ...}
 ```
@@ -512,14 +498,13 @@ is the largest contributor to revenue."
 → Coherent narrative in single chunk, better retrieval
 
 **Benefits:**
-1. **Fewer Chunks:** Reduces embedding costs and retrieval latency
-2. **More Context:** Each chunk contains more complete information
-3. **Better Retrieval:** Single chunk retrieved instead of multiple fragments
-4. **Improved LLM Performance:** More coherent context for answer generation
+1. **Fewer Chunks + More Context:** Each chunk contains more complete information
+2. **Better Retrieval:** Single chunk retrieved instead of multiple fragments
+3. **Improved LLM Performance:** More coherent context for answer generation
 
 ### Why Adjacent-Only Merging?
 
-**Design Choice:** Only merge adjacent chunks (i, i+1), not distant chunks (i, i+5).
+**Design Choice:** Only merge adjacent chunks, not distant chunks.
 
 **Rationale:**
 1. **Preserves Document Flow:** Maintains narrative order
@@ -543,11 +528,7 @@ Table: "| Segment | Revenue | Growth |\n|---------|---------|--------|..."
 
 **Solution:** Enforce type matching (`is_table` must match).
 
-**Rationale:**
-1. **Different Semantics:** Tables are structured data, text is narrative
-2. **Retrieval Quality:** Users searching for tables want tables, not mixed content
-3. **LLM Processing:** LLMs handle tables and text differently
-4. **Metadata Preservation:** Table-specific metadata (page, shape) only applies to tables
+**Rationale:** Tables are structured data while text is narrative. Additionally, LLMs handle tables and text differently
 
 ### Why Higher Threshold for Tables?
 
@@ -590,21 +571,24 @@ Table 2: Revenue by Segment (2023)
 
 ## Merge Statistics
 
+**Note:** These statistics are for semantic merging applied **after** text+table merging (i.e., `_chunks_merged.json` → `_chunks_merged_semantic.json`).
+
 | Company | Original Chunks | Merged Chunks | Reduction | Avg Size Before | Avg Size After |
 |---------|-----------------|---------------|-----------|-----------------|----------------|
-| Grab    | 688             | 456           | 33.7%     | 1307            | 2134           |
-| SQ      | 530             | 367           | 30.8%     | 1445            | 2287           |
-| SEA     | 498             | 342           | 31.3%     | 1402            | 2198           |
+| Grab    | 936             | 838           | 10.5%     | 1326            | 1481           |
+| SQ      | 1009            | 894           | 11.4%     | 1277            | 1441           |
+| SEA     | 865             | 786           | 9.1%      | 1478            | 1627           |
 
 **Observations:**
-- **~30-35% reduction** in chunk count
-- **~60-70% increase** in average chunk size
-- Tables rarely merge (strict threshold)
+- **~9-11% reduction** in chunk count (conservative threshold of 0.7)
+- **~12% increase** in average chunk size
+- Tables rarely merge (strict threshold + type mismatch prevention)
 - Most merges in narrative sections (CEO letter, business overview)
+- Lower reduction compared to text-only semantic merging because merged chunks already contain cohesive content
 
 ## Logging
 
-Semantic merging operations logged to `logs/logs_{timestamp}.log` with prefix `semantic_chunking`.
+Semantic merging operations logged to `logs/logs_{num}.log` with prefix `semantic_chunking`.
 
 **Key Log Messages:**
 - `"Initialized SemanticChunker with: ..."` - Configuration
@@ -624,25 +608,6 @@ Semantic merging operations logged to `logs/logs_{timestamp}.log` with prefix `s
 - **API Rate Limits:** Batch processing respects OpenAI rate limits
 - **Token Limit Exceeded:** Truncates content to 30,000 chars (~7500 tokens)
 - **Empty Chunks:** Handles gracefully (no merges performed)
-
-## Performance
-
-| Company | Chunks | Embedding Time | Merge Time | Total Time | API Cost |
-|---------|--------|----------------|------------|------------|----------|
-| Grab    | 688    | ~15s           | ~3s        | ~18s       | $0.003   |
-| SQ      | 530    | ~12s           | ~2s        | ~14s       | $0.002   |
-| SEA     | 498    | ~11s           | ~2s        | ~13s       | $0.002   |
-
-**Cost Calculation:**
-- OpenAI text-embedding-3-small: $0.00002 per 1K tokens
-- Average chunk: ~300 tokens
-- 688 chunks × 300 tokens = 206,400 tokens
-- Cost: 206.4 × $0.00002 = $0.004
-
-**Optimization:**
-- Batch embedding (100 chunks per API call)
-- Minimal re-embedding (average vectors for chains)
-- Efficient similarity calculation (numpy vectorization)
 
 ## Dependencies
 

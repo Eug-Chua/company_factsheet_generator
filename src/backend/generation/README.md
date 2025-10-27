@@ -2,7 +2,7 @@
 
 ## Overview
 
-Core module for **credit analysis factsheet generation** using Retrieval-Augmented Generation (RAG). Implements advanced retrieval strategies including 2-stage re-ranking, hybrid search (semantic + BM25), section-aware boosting, and batch processing to answer 57 financial questions from annual reports.
+Core module for **credit analysis factsheet generation** using Retrieval-Augmented Generation (RAG). Implements advanced retrieval strategies including Multi-HyDE (Multiple Hypothetical Document Embeddings), 2-stage re-ranking with cross-encoder, hybrid search (semantic + BM25), section-aware boosting, and batch processing to answer key financial questions from annual reports.
 
 ## Architecture
 
@@ -64,7 +64,7 @@ def _rerank_chunks_for_precision(retrieved_chunks, category_questions):
 - Use semantic search only
 - No keyword search (relies on context understanding)
 
-# Calculated Metrics (Q36-Q57): Pure Semantic Search
+# Calculated Metrics (Q36-Q60): Pure Semantic Search
 - Use semantic search only
 - Relies on finding relevant data points
 ```
@@ -145,7 +145,74 @@ response = llm_client.call_llm(prompt, max_tokens=2000)
 # Automatically routes to configured provider
 ```
 
-### 4. `embedder.py`
+### 4. `multi_hyde.py`
+**Multi-HyDE (Multiple Hypothetical Document Embeddings) for enhanced retrieval.**
+
+**Purpose:** Improves retrieval accuracy by generating multiple query variants and hypothetical documents, then reranking with cross-encoder.
+
+**6-Step Process:**
+```python
+1. Generate N diverse query variants from original question (default: 5)
+   Example: "What is the company's revenue?" →
+   - "What were the company's total sales in the fiscal year?"
+   - "How much income did the company generate?"
+   - "What is the company's top-line financial performance?"
+
+2. Generate hypothetical document for each variant
+   - LLM generates what an ideal answer would look like
+   - These are more similar to actual document chunks than questions
+
+3. Embed each hypothetical document
+   - Uses same embedder as chunks (all-mpnet-base-v2)
+   - Creates semantic representations in embedding space
+
+4. Retrieve top-k chunks per hypothetical document (default: k=10)
+   - Semantic search using hypothetical doc embeddings
+   - Each variant retrieves potentially different relevant chunks
+
+5. Aggregate and deduplicate results
+   - Combine all retrieved chunks
+   - Remove duplicates
+   - Typically results in 30-50 unique chunks
+
+6. Cross-encoder reranking using original question
+   - MS-MARCO MiniLM cross-encoder
+   - Scores each chunk against original question
+   - Returns top-30 most relevant chunks
+```
+
+**Configuration:**
+```yaml
+# From config.yaml
+multi_hyde:
+  enabled: true
+  num_variants: 5                              # Number of query variants to generate
+  k_per_hypothetical: 10                       # Chunks to retrieve per variant
+  cross_encoder_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+```
+
+**Key Methods:**
+- `retrieve_with_multi_hyde()` - Main entry point for Multi-HyDE retrieval
+- `_generate_query_variants()` - Generate diverse query variants via LLM
+- `_generate_hypothetical_document()` - Generate hypothetical answer for variant
+- `_retrieve_per_variant()` - Retrieve chunks using hypothetical doc embedding
+- `_aggregate_and_deduplicate()` - Combine and deduplicate results
+- `_cross_encoder_rerank()` - Rerank with cross-encoder using original question
+
+**Why it Works:**
+1. **Query Expansion:** Multiple variants capture different semantic angles
+2. **HyDE Effect:** Hypothetical documents are more similar to actual chunks than questions
+3. **Diversity:** Different variants retrieve different but relevant chunks
+4. **Cross-Encoder Precision:** Final reranking ensures highest quality results
+
+**Performance Impact:**
+- **Time:** ~12-14 minutes per company (60 questions × 5 variants = 300 LLM calls)
+- **Quality:** +2.8% overall improvement, +7.0% context precision improvement
+- **Trade-off:** Slower but significantly more accurate retrieval
+
+See [MULTI_HYDE_FLOW_WITH_EXAMPLES.md](MULTI_HYDE_FLOW_WITH_EXAMPLES.md) for detailed examples.
+
+### 5. `embedder.py`
 **Semantic search using Sentence Transformers.**
 
 **Embedding Model:**
@@ -180,7 +247,7 @@ chunk_text = f"{chunk['section_header']}\n\n{chunk['content']}"
 Revenue for FY2024 increased by 15%..."
 ```
 
-### 5. `bm25_retriever.py`
+### 6. `bm25_retriever.py`
 **Keyword search using BM25 with Reciprocal Rank Fusion (RRF).**
 
 **BM25 Algorithm:**
@@ -218,7 +285,7 @@ Chunk B: semantic_rank=10, bm25_rank=1
 - `reciprocal_rank_fusion()` - Combine two result lists
 - `retrieve_hybrid()` - Hybrid semantic + BM25 retrieval
 
-### 6. `section_booster.py`
+### 7. `section_booster.py`
 **Applies section-aware and position-based boosting.**
 
 **Section-Aware Boosting:**
@@ -263,7 +330,7 @@ Chunk 687 (position=1.00): boost = 0.01 → 1% increase
 - `apply_document_structure_boost()` - Position-based boosting
 - `get_section_patterns_for_question()` - Determine relevant sections
 
-### 7. `category_parser.py`
+### 8. `category_parser.py`
 **Dynamically parses question set structure from markdown.**
 
 **Key Responsibilities:**
@@ -302,7 +369,7 @@ Question: "Calculate free cash flow for 2024, 2023, 2022"
 → Extracted keywords: "cash flow" capex FCF "cash flow statement"
 ```
 
-### 8. `terminology_mapper.py`
+### 9. `terminology_mapper.py`
 **Auto-detects company-specific financial terminology.**
 
 **Problem:**
@@ -344,7 +411,7 @@ Substituted keywords: 'debt "total borrowings" "debt obligations" capex "capital
 - `detect_company_terminology()` - Detect all terminology
 - `substitute_terms()` - Apply substitutions to keywords
 
-### 9. `prompt_builder.py`
+### 10. `prompt_builder.py`
 **Builds prompts for LLM and parses responses.**
 
 **Prompt Structure:**
@@ -392,7 +459,7 @@ Pattern: r'\*\*Question (\d+):[^\n]*\*\*\s*(.*?)(?=\*\*Question \d+:|\Z)'
  11: "- 2024: $348M, 2023: $213M, 2022: $(641)M"}
 ```
 
-### 10. `answer_generator.py`
+### 11. `answer_generator.py`
 **Generates answers using LLM (single/batch).**
 
 **Key Methods:**
@@ -424,7 +491,7 @@ Revenue for FY2024 increased by 15%...
 ...
 ```
 
-### 11. `factsheet_formatter.py`
+### 12. `factsheet_formatter.py`
 **Formats Q&A pairs into structured markdown.**
 
 **Output Format:**
@@ -462,7 +529,7 @@ Revenue for FY2024 increased by 15%...
 Question Set (MD) → Parse → Categories + Ranges
 Chunks (JSON) → Load → All Chunks (text + tables)
     ↓                         ↓
-    ↓             Detect Terminology
+    ↓                 Detect Terminology
     ↓                         ↓
     ├─────────────┬───────────┴──────────────────┐
     ↓             ↓                              ↓
@@ -697,7 +764,7 @@ Stage 2: Refine to top 30
 
 ### Why Batch Processing?
 
-**Problem:** 57 questions × single API call = 57 calls (slow + expensive)
+**Problem:** 60 questions × single API call = 60 calls (slow + expensive)
 
 **Solution:** Batch by category
 ```
@@ -738,7 +805,7 @@ Hybrid (RRF):
 
 ### Why Section Boosting?
 
-**Problem:** Business fundamentals info (Q1-Q9) scattered across document.
+**Problem:** Business fundamentals info (Q1-Q9) usually occur in the first few sections.
 
 **Solution:** Boost sections known to contain relevant info.
 ```
@@ -754,7 +821,7 @@ Top chunks: CEO Letter, Business Overview, Strategic Review
 ```
 
 **Rationale:**
-- Annual reports follow standard structure
+- Annual reports follow a rough standard structure
 - Certain sections reliably contain certain info types
 - Boosting leverages document structure knowledge
 
@@ -800,39 +867,6 @@ Capex vs Capital Expenditure vs Additions to Property
 → Better keyword matching in BM25
 ```
 
-## Performance
-
-### Generation Time
-
-| Company | Questions | Categories | Generation Time | API Calls | Cost    |
-|---------|-----------|------------|-----------------|-----------|---------|
-| Grab    | 57        | 9          | ~45s            | 9         | $0.15   |
-| SQ      | 57        | 9          | ~42s            | 9         | $0.14   |
-| SEA     | 57        | 9          | ~40s            | 9         | $0.13   |
-
-### Breakdown
-
-| Step                     | Time  | % of Total |
-|--------------------------|-------|------------|
-| Load data                | ~2s   | 4%         |
-| Detect terminology       | ~1s   | 2%         |
-| Embedding (first cat)    | ~3s   | 7%         |
-| Retrieval (all cats)     | ~5s   | 11%        |
-| LLM calls (9 batches)    | ~30s  | 67%        |
-| Formatting & saving      | ~1s   | 2%         |
-| **Total**                | ~45s  | 100%       |
-
-**Bottleneck:** LLM API calls (67% of time)
-
-### Cost Breakdown (Claude Haiku)
-
-| Operation         | Tokens | Cost     |
-|-------------------|--------|----------|
-| Input (30 chunks) | ~8000  | $0.002   |
-| Output (answers)  | ~500   | $0.001   |
-| Per category      | —      | $0.003   |
-| **Total (9 cats)**| —      | **$0.027** |
-
 ### Optimization Strategies
 
 **Current optimizations:**
@@ -849,7 +883,7 @@ Capex vs Capital Expenditure vs Additions to Property
 
 ## Logging
 
-Generation operations logged to `logs/logs_{timestamp}.log` with prefix `generation`.
+Generation operations logged to `logs/logs_{num}.log` with prefix `generation`.
 
 **Key Log Messages:**
 - `"Loading questions and chunks..."` - Data loading
@@ -901,11 +935,6 @@ Generation operations logged to `logs/logs_{timestamp}.log` with prefix `generat
 
 ## Future Enhancements
 
-- **Multi-Turn Conversations:** Allow follow-up questions
-- **Citation Tracking:** Show which chunks contributed to each answer
-- **Confidence Scores:** Estimate answer confidence based on retrieval scores
-- **Query Expansion:** Auto-expand queries with synonyms
-- **Active Learning:** Learn from user feedback to improve retrieval
-- **Caching:** Cache embeddings and terminology across runs
-- **Parallel Processing:** Process categories in parallel
-- **Streaming:** Stream answers as they're generated
+- Cache embeddings and terminology across runs
+- Process categories in parallel
+- Adaptive Multi-HyDE (vary num_variants based on question complexity)
