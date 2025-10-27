@@ -58,7 +58,6 @@ Requirements:
 **Solution: 2-Pass Extraction System**
 - **Pass 1:** Fast text extraction (no table processing) using Docling
 - **Pass 2:** Accurate table extraction with cell-level matching
-- **Result:** Clean markdown text + structured tables with 95%+ accuracy
 
 **Implementation:** [`src/backend/conversion/`](src/backend/conversion/README.md)
 
@@ -79,7 +78,7 @@ Our Solution:
 
 ### Challenge 2: Retrieval Quality for Qualitative Questions
 
-**Problem:** Business fundamental questions (Q1-Q9) were retrieving wrong chunks—high chunk IDs (500+) instead of early overview sections (0-100).
+**Problem:** Business fundamental questions (Q1-Q9) were retrieving wrong chunks—high chunk IDs (300+). However most of the relevant information are usually stored in the early overview sections (chunks 0-100).
 
 **Investigation Findings:**
 ```
@@ -138,7 +137,7 @@ final_chunks = cross_encoder.rerank(question, unique_chunks, top_k=50)
 
 **B. Section-Aware Boosting**
 ```python
-# Boost relevant sections by 80%
+# Boost predefined relevant sections by 80%
 Question: "What industries does the company operate in?"
 Sections to boost: ['chairman', 'ceo', 'business overview', 'operations']
 boosted_similarity = original_similarity × (1 + 0.8)
@@ -146,7 +145,7 @@ boosted_similarity = original_similarity × (1 + 0.8)
 
 **C. Document Structure Boosting**
 ```python
-# Early chunks get exponential boost
+# Earlier chunks get exponential boost
 boost_factor = 0.3 × exp(-3.0 × position)
 Chunk 0: +30% boost    (important overview info)
 Chunk 100: +19% boost
@@ -173,16 +172,15 @@ hybrid_results = reciprocal_rank_fusion(semantic, bm25)
 **Problem:** Retrieving too many chunks wastes context window on irrelevant content. Retrieving too few misses important information.
 
 **Solution: 2-Stage Retrieval**
-- **Stage 1: Broad Retrieval (50-60 chunks)**
+- **Stage 1: Broad Retrieval (50 chunks)**
   - Cast wide net to ensure relevant content is captured
   - Apply section boosting and document structure boosting
-  - Use hybrid search for qualitative questions
+  - Use multi-HyDE for qualitative questions
 
 - **Stage 2: Re-ranking (30 chunks)**
   - Combine ALL category questions into single query
   - Re-compute similarities against combined query
   - Select top 30 most relevant chunks
-  - Removes noise while preserving signal
 
 **Implementation:** [`src/backend/generation/factsheet_generator.py`](src/backend/generation/factsheet_generator.py)
 
@@ -490,18 +488,21 @@ This diagnostic capability was essential for identifying and fixing our qualitat
         │  │                                │  │
         │  │ Q1-Q9 (Qualitative):           │  │
         │  │  • Multi-HyDE (5 variants)     │  │
+        │  │  • 5 hypothetical docs gen     │  │
         │  │  • Cross-encoder rerank        │  │
+        │  │  • Time: ~10-15s per category  │  │
         │  │                                │  │
         │  │ Q10-Q60 (Quantitative):        │  │
         │  │  • Hybrid search (Sem + BM25)  │  │
         │  │  • Section boosting            │  │
+        │  │  • Time: ~10-15s per category  │  │
         │  │                                │  │
         │  │ Both:                          │  │
         │  │  • Stage 2: Rerank to 30       │  │
         │  │  • Batch generate answers      │  │
         │  └────────────────────────────────┘  │
         │                                      │
-        │  Time: ~1min, Output: 60 Q&A pairs   │
+        │  Time: ~1.8min, Output: 60 Q&A pairs │
         └──────────────┬───────────────────────┘
                        │
                        ▼
@@ -510,7 +511,8 @@ This diagnostic capability was essential for identifying and fixing our qualitat
         │     • Faithfulness (no hallucination)│
         │     • Answer Relevancy               │
         │     • Context Precision & Recall     │
-        │     Time: ~2min, Output: Scores      │
+        │     • 4 metrics × 60 questions       │
+        │     Time: ~15.7min, Output: Scores   │
         └──────────────┬───────────────────────┘
                        │
                        ▼
@@ -521,7 +523,9 @@ This diagnostic capability was essential for identifying and fixing our qualitat
                 │  • QA Pairs │
                 └─────────────┘
 
-Total Pipeline Time: ~17-18 minutes per company (measured across 6 companies)
+Total Pipeline Time: ~17.5 minutes per company (measured across 6 companies)
+  • Generation: ~1.8 min (10%)
+  • Evaluation: ~15.7 min (90%) - Optional in production
 ```
 
 ### Detailed Component Flow
@@ -712,35 +716,6 @@ python main.py --company grab --skip-conversion
 python main.py --all
 ```
 
-### Run Individual Steps
-
-```bash
-# Step 1: Convert PDF to Markdown
-python -m src.backend.conversion.markdown_converter --company grab
-
-# Step 2: Validate Extraction
-python -m src.backend.pre_extraction_validation.conversion_validator --company grab
-
-# Step 3: Extract Text Chunks
-python -m src.backend.extraction.extractor --company grab
-
-# Step 4: Extract Table Chunks
-python -m src.backend.table_extraction.table_extractor --company grab
-
-# Step 5: Merge Chunks
-python -m src.backend.chunking.merge_chunking.chunk_merger --company grab
-
-# Step 6: Semantic Chunking
-python -m src.backend.chunking.semantic_chunking.semantic_chunker \
-    --chunks outputs/grab/grab_chunks_merged.json
-
-# Step 7: Generate Factsheet
-python -m src.backend.generation.factsheet_generator --company grab
-
-# Step 8: Evaluate with RAGAS
-python -m src.backend.evaluation.ragas_evaluator --company grab
-```
-
 ---
 
 ## Configuration
@@ -772,7 +747,7 @@ ollama_model: qwen2.5:32b
 
 ### Retrieval Strategies
 
-**Multi-HyDE (For Qualitative Questions Q1-Q9)** ⭐ **RECOMMENDED**
+**Multi-HyDE (For Qualitative Questions Q1-Q9)**
 - Best for: Qualitative questions, business fundamentals
 - How it works:
   1. Generates 5 diverse query variants
@@ -783,7 +758,7 @@ ollama_model: qwen2.5:32b
 - Cons: Slower (~12-17s per question vs ~10-14s), requires LLM API calls
 - Configuration: See [Multi-HyDE Configuration](#multi-hyde-configuration)
 
-**Hybrid Search (For Quantitative Questions Q10-Q60)** ✅ **DEFAULT**
+**Hybrid Search (For Quantitative Questions Q10-Q60)**
 - Best for: Financial data extraction, numerical queries
 - Combines: Semantic search + BM25 keyword matching
 - Uses: Reciprocal Rank Fusion (RRF) to merge results
@@ -1309,30 +1284,36 @@ This section shows how Multi-HyDE affected each company individually, broken dow
 
 **Measured on Oct 23, 2025 across 6 companies (Capitaland, Grab, Sea, SQ, Tesla, WeRide)**
 
-| Metric                | Value          |
-|-----------------------|----------------|
-| **Total Pipeline Time**   | **~17.4 minutes** |
-| PDF Conversion        | ~40 seconds    |
-| Semantic Chunking     | ~15-20 seconds |
-| Multi-HyDE Generation | ~12-14 minutes |
-| RAGAS Evaluation      | ~2-3 minutes   |
+| Metric                     | Value          | % of Total |
+|----------------------------|----------------|------------|
+| **Total Pipeline Time**    | **~17.5 minutes** | **100%** |
+| PDF Conversion             | ~40 seconds    | ~4%        |
+| Semantic Chunking          | ~15-20 seconds | ~2%        |
+| **Factsheet Generation (Multi-HyDE)** | **~1.8 minutes** | **~10%** |
+| **RAGAS Evaluation**       | **~15.7 minutes** | **~90%** |
 
 **Per-Company Breakdown:**
-- **Capitaland**: 17.4 minutes (1044.4s)
-- **Grab**: 17.3 minutes (1039.5s)
-- **Sea**: 17.1 minutes (1027.0s)
-- **SQ**: 17.4 minutes (1044.8s)
-- **Tesla**: 17.4 minutes (1041.8s)
-- **WeRide**: 18.0 minutes (1079.9s)
-- **Average**: 17.4 minutes (range: 17.1-18.0 min)
+
+| Company | Total Time | Generation | Evaluation | Eval % |
+|---------|------------|------------|------------|--------|
+| Grab    | 17.3 min   | 1.9 min    | 15.4 min   | 88.9%  |
+| Sea     | 17.1 min   | 1.7 min    | 15.4 min   | 90.1%  |
+| SQ      | 17.4 min   | 1.8 min    | 15.6 min   | 89.7%  |
+| WeRide  | 18.0 min   | 2.0 min    | 16.0 min   | 89.0%  |
+| Tesla   | 17.4 min   | 1.6 min    | 15.7 min   | 90.6%  |
+| **Average** | **17.5 min** | **1.8 min** | **15.7 min** | **89.8%** |
 
 **Notes:**
-- Multi-HyDE is the dominant time consumer (~70-80% of total time) due to:
-  - Generating 3 hypothetical documents per question (60 questions × 3 = 180 LLM calls)
-  - Embedding generation for each hypothetical document
-  - Multi-stage retrieval and cross-encoder reranking
-- Conversion and chunking are fast (<1 minute combined)
-- Evaluation time varies based on question complexity and ground truth detail
+- **RAGAS evaluation is the dominant time consumer (~90% of total time)** due to:
+  - Running 4 metrics (Faithfulness, Answer Relevancy, Context Precision, Context Recall) on 60 questions
+  - Each metric requires multiple LLM calls for assessment
+  - Total: ~240+ LLM evaluation calls per company
+- **Multi-HyDE generation takes only ~10% of total time** despite:
+  - Generating 5 hypothetical documents per qualitative question (9 questions × 5 = 45 LLM calls)
+  - Cross-encoder reranking for all qualitative questions
+  - Embedding generation for hypothetical documents
+- Conversion and chunking are very fast (~1 minute combined, <6% of total time)
+- For production use without continuous evaluation, pipeline would be **~1.8 minutes per company**
 
 ---
 
@@ -1362,7 +1343,40 @@ Stage 2: Re-ranking with combined query (30 chunks)
 Result: Better context utilization
 ```
 
-### 3. Hybrid Search
+### 3. Multi-HyDE (Multiple Hypothetical Document Embeddings)
+```python
+# For qualitative questions (Q1-Q9 only)
+Question: "What industries does the company operate in?"
+
+Step 1: Generate 5 diverse query variants
+  → "Describe primary business sectors..."
+  → "What are main revenue-generating lines..."
+  → "Which market segments does company serve..."
+  → ...
+
+Step 2: Generate hypothetical answers for each variant
+  → "The company operates in real estate sector, focusing on..."
+  → "Primary revenue comes from commercial property development..."
+  → ... (5 hypothetical documents)
+
+Step 3: Embed hypothetical documents (NOT questions)
+  → hypothesis_embeddings = embed(hypothetical_docs)
+
+Step 4: Retrieve top-10 chunks per hypothesis
+  → 5 × 10 = 50 chunks
+
+Step 5: Deduplicate → ~35 unique chunks
+
+Step 6: Rerank with cross-encoder
+  → final_chunks = cross_encoder.rerank(original_question, chunks, top_k=50)
+
+Result:
+  → +24.2% context precision for qualitative questions
+  → +22.5% faithfulness improvement
+  → Better captures nuanced business concepts across diverse document sections
+```
+
+### 4. Hybrid Search
 ```
 Semantic: "What is the company's revenue?"
   → Matches: "Total sales", "Income from operations"
@@ -1374,7 +1388,7 @@ Hybrid (RRF):
   → Gets both semantic understanding + exact matches
 ```
 
-### 4. Auto-Terminology Detection
+### 5. Auto-Terminology Detection
 ```python
 Company A report says: "Total Borrowings" (not "Total Debt")
 Company B report says: "Adjusted EBITDA" (not "EBITDA")
@@ -1384,7 +1398,7 @@ System auto-detects and expands keywords:
 "EBITDA" → "EBITDA 'Adjusted EBITDA'"
 ```
 
-### 5. Batch Processing
+### 6. Batch Processing
 ```
 Instead of: 60 separate API calls (one per question)
 We do: 9 API calls (one per category)
@@ -1395,7 +1409,7 @@ Result:
 - More consistent answers within categories
 ```
 
-### 6. RAGAS Evaluation
+### 7. RAGAS Evaluation
 ```
 Automatic quality assessment:
 ✓ Faithfulness: No hallucinations
@@ -1403,7 +1417,7 @@ Automatic quality assessment:
 ✓ Precision: Good chunk ranking
 ✓ Recall: Complete information retrieval
 
-No manual ground truth needed./con
+No manual ground truth needed.
 ```
 
 ---
