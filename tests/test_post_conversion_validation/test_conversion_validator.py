@@ -1,7 +1,6 @@
 import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch
-import json
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.joinpath("src", "backend")))
