@@ -44,13 +44,13 @@ class PromptBuilder:
 ## QUESTION SET STRUCTURE (V3)
 This question set has THREE types of questions:
 
-1. **QUALITATIVE (Q1-Q8)**: Business fundamentals, risks, liabilities
-2. **DATA EXTRACTION (Q7-Q35)**: Pure retrieval - extract exact figures from financial statements
+1. **QUALITATIVE (Q1-Q9)**: Business fundamentals, risks, liabilities
+2. **DATA EXTRACTION (Q10-Q35)**: Pure retrieval - extract exact figures from financial statements
 3. **CALCULATIONS (Q36-Q60)**: Compute metrics using data from previous questions
 
 ## LENGTH REQUIREMENTS
 
-**For QUALITATIVE questions (Q1-Q8):**
+**For QUALITATIVE questions (Q1-Q9):**
 - 3-5 bullet points maximum
 - Include key details, names, relationships
 - For conditional questions (Q3a/b, Q5a/b, Q6a/b):
@@ -58,7 +58,7 @@ This question set has THREE types of questions:
   - Part (b): Only provide details if (a) is Yes
 - If data is missing, state briefly: "Not disclosed in provided context"
 
-**For DATA EXTRACTION questions (Q7-Q35):**
+**For DATA EXTRACTION questions (Q10-Q35):**
 - 1-3 bullet points maximum
 - Extract EXACT figures from financial statements
 - Format: "2024: $5,372M, 2023: $4,835M, 2022: $1,433M"
@@ -73,7 +73,7 @@ This question set has THREE types of questions:
 
 ## DATA EXTRACTION GUIDELINES
 
-**PART 2: DATA EXTRACTION (Q7-Q35) - NO CALCULATIONS**
+**PART 2: DATA EXTRACTION (Q10-Q35) - NO CALCULATIONS**
 
 1. **Find the official financial statements:**
    - Income Statement: "Consolidated Income Statement" or "Statement of Profit or Loss"
